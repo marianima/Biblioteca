@@ -887,44 +887,81 @@ async function saveCurrent(){const b=library.find(x=>x.id===selBookId);if(!b)ret
 async function rebuscarMetadatos(id) {
   const b = library.find(x => x.id === id);
   if (!b) return;
-  // Ask user to confirm/correct title and author before searching
   const titulo = prompt('Título a buscar:', b.titulo || '');
   if (!titulo) return;
-  const autor = prompt('Autor (opcional, ayuda a afinar):', b.autor || '');
+  const autor = prompt('Autor (opcional):', b.autor || '');
   toast('Buscando metadatos...', 'info');
   try {
     const q = titulo + (autor ? ' ' + autor : '');
+
+    // 1. Try Google Books in Spanish first (better descriptions in Spanish)
+    let gbDescripcion = '';
+    let gbCover = '';
+    try {
+      const gbR = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=3`);
+      const gbD = await gbR.json();
+      const esItems = (gbD.items || []).filter(item => {
+        const lang = item.volumeInfo?.language || '';
+        return lang === 'es' || lang === '';
+      });
+      if (esItems.length) {
+        const info = esItems[0].volumeInfo || {};
+        if (info.description) gbDescripcion = info.description;
+        if (info.imageLinks?.thumbnail) gbCover = info.imageLinks.thumbnail.replace('http:', 'https:').replace('zoom=1', 'zoom=3');
+      }
+    } catch(e) {}
+
+    // 2. Open Library for structured metadata + author bio
     const results = await fetchBooks(q);
-    if (!results.length) { toast('No se encontraron resultados', 'err'); return; }
-    const m = results[0];
-    // Update fields only if found value is better than current
-    if (m.cover) b.portada_url = m.cover;
-    if (m.titulo && m.titulo.length > 2) b.titulo = m.titulo;
-    if (m.autor && m.autor.length > 2 && !b.autor) b.autor = m.autor;
-    if (m.año) b.año = m.año;
-    if (m.editorial) b.editorial = m.editorial;
-    if (m.isbn) b.isbn = m.isbn;
-    if (m.paginas) b.paginas = m.paginas;
-    if (m.genero) b.genero = m.genero;
-    if (m.idioma) b.idioma = m.idioma;
-    // Enrich from Open Library
-    if (m.olKey) {
-      try {
-        const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
-        const wd = await wr.json();
-        if (wd.description) b.descripcion = typeof wd.description === 'string' ? wd.description : wd.description.value || b.descripcion;
-        if (wd.subjects?.length && !b.genero) b.genero = wd.subjects[0];
-        if (wd.authors?.length) {
-          try {
+    if (!results.length && !gbDescripcion) { toast('No se encontraron resultados', 'err'); return; }
+
+    if (results.length) {
+      const m = results[0];
+      // Update cover: prefer higher res Google Books cover, fallback to Open Library
+      const newCover = gbCover || (m.cover ? m.cover.replace('-M.jpg', '-L.jpg') : '');
+      if (newCover) b.portada_url = newCover + '?t=' + Date.now(); // cache buster
+      if (m.titulo && m.titulo.length > 2) b.titulo = m.titulo;
+      if (m.autor && m.autor.length > 2) b.autor = m.autor;
+      if (m.año) b.año = m.año;
+      if (m.editorial) b.editorial = m.editorial;
+      if (m.isbn) b.isbn = m.isbn;
+      if (m.paginas) b.paginas = m.paginas;
+      if (m.genero) b.genero = m.genero;
+      if (m.idioma) b.idioma = m.idioma || 'es';
+
+      // Use Spanish description (Google Books ES) or Open Library
+      if (gbDescripcion) {
+        b.descripcion = gbDescripcion;
+      } else if (m.olKey) {
+        try {
+          const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
+          const wd = await wr.json();
+          if (wd.description) b.descripcion = typeof wd.description === 'string' ? wd.description : wd.description.value || '';
+          if (wd.subjects?.length && !b.genero) b.genero = wd.subjects[0];
+        } catch(e) {}
+      }
+      // Author bio from Open Library
+      if (m.olKey) {
+        try {
+          const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
+          const wd = await wr.json();
+          if (wd.authors?.length) {
             const ar = await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);
             const ad = await ar.json();
             if (ad.bio) b.bio_autor = typeof ad.bio === 'string' ? ad.bio : ad.bio.value || '';
-          } catch(e) {}
-        }
-      } catch(e) {}
+          }
+        } catch(e) {}
+      }
+    } else if (gbCover) {
+      b.portada_url = gbCover + '?t=' + Date.now();
+      if (gbDescripcion) b.descripcion = gbDescripcion;
     }
+
     await saveToDrive();
     renderLib();
+    // Force cover refresh in detail panel
+    const coverImg = document.querySelector('#dp-cover-wrap img');
+    if (coverImg && b.portada_url) coverImg.src = b.portada_url;
     renderDetail(b);
     toast('Metadatos actualizados ✓', 'ok');
   } catch(e) {
