@@ -892,29 +892,40 @@ async function rebuscarMetadatos(id) {
   const autor = prompt('Autor (opcional):', b.autor || '');
   toast('Buscando metadatos...', 'info');
   try {
-    const q = titulo + (autor ? ' ' + autor : '');
+    // ── PASO 0: Limpiar datos incorrectos del archivo EPUB antes de todo ──
+    // La portada base64 y el ISBN pueden venir del archivo y ser incorrectos
+    if (b.portada_url && b.portada_url.startsWith('data:')) b.portada_url = '';
+    // Limpiar ISBN si el usuario cambió el título significativamente
+    // (el ISBN del archivo puede ser de otro libro)
+    const tituloAnterior = b.titulo || '';
+    if (b.isbn && similarityScore(tituloAnterior, titulo) < 0.5) {
+      b.isbn = ''; // El ISBN probablemente corresponde a otro libro
+    }
+    b.descripcion = ''; // Limpiar descripción anterior siempre al rebuscar
+    b.titulo = titulo;
+    if (autor) b.autor = autor;
 
-    // ── 1. PORTADA: cascada ISBN → OL exacto → GB comillas + validación ──
+    // ── 1. PORTADA: cascada ISBN → OL exacto → GB con validación ──
     let newCover = '';
     let foundTitle = '';
 
-    // A) ISBN primero — resultado exacto garantizado
+    // A) ISBN si está disponible y es confiable
     if (b.isbn) {
       try {
         const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${b.isbn}&maxResults=1`);
         const d = await r.json();
         const info = d.items?.[0]?.volumeInfo;
-        if (info?.imageLinks?.thumbnail) {
+        if (info?.imageLinks?.thumbnail && similarityScore(info.title||'', titulo) > 0.5) {
           newCover = info.imageLinks.thumbnail.replace('http:','https:').replace('zoom=1','zoom=3');
           foundTitle = info.title || '';
         }
       } catch(e) {}
     }
 
-    // B) Open Library cover by exact title+author (more precise than Google for Spanish)
+    // B) Open Library por título exacto + autor
     if (!newCover) {
       try {
-        const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(titulo)}&author=${encodeURIComponent(autor||'')}&limit=3&fields=key,title,cover_i`);
+        const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(titulo)}&author=${encodeURIComponent(autor||'')}&limit=5&fields=key,title,cover_i`);
         const d = await r.json();
         const best = (d.docs||[]).find(doc => similarityScore(doc.title||'', titulo) > 0.6);
         if (best?.cover_i) {
@@ -927,13 +938,10 @@ async function rebuscarMetadatos(id) {
     // C) Google Books con título entre comillas + autor
     if (!newCover) {
       try {
-        const qExact = `"${titulo}"${autor?' '+autor:''}`;
-        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&langRestrict=es&maxResults=3`);
+        const qExact = `intitle:"${titulo}"${autor?' inauthor:"'+autor+'"':''}`;
+        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&maxResults=5`);
         const d = await r.json();
-        const best = (d.items||[]).find(item => {
-          const t = item.volumeInfo?.title || '';
-          return similarityScore(t, titulo) > 0.6;
-        });
+        const best = (d.items||[]).find(item => similarityScore(item.volumeInfo?.title||'', titulo) > 0.55);
         if (best?.volumeInfo?.imageLinks?.thumbnail) {
           newCover = best.volumeInfo.imageLinks.thumbnail.replace('http:','https:').replace('zoom=1','zoom=3');
           foundTitle = best.volumeInfo.title || '';
@@ -941,24 +949,17 @@ async function rebuscarMetadatos(id) {
       } catch(e) {}
     }
 
-    // Limpiar portada base64 incrustada del archivo antes de asignar la nueva
-    // (las base64 empiezan con "data:" y suelen ser portadas del propio EPUB, que pueden ser incorrectas)
-    if (b.portada_url && b.portada_url.startsWith('data:')) {
-      b.portada_url = '';
-    }
-
     if (newCover) {
       b.portada_url = newCover + '?t=' + Date.now();
       toast(`Portada encontrada: "${foundTitle}"`, 'info');
     } else {
-      toast('No se encontró portada confiable. Podés subirla manualmente con "🖼 Cambiar portada".', 'info');
+      toast('No se encontró portada. Podés subirla con "🖼 Cambiar portada".', 'info');
     }
 
-    // ── 2. DESCRIPCIÓN EN ESPAÑOL — usar SOLO título+autor ingresados ──
+    // ── 2. DESCRIPCIÓN en español — buscar solo por título+autor ──
     let gbDescripcion = '';
     try {
-      // Nunca usar b.descripcion como fuente — solo el título y autor que el usuario confirmó
-      const qExact = b.isbn ? `isbn:${b.isbn}` : `"${titulo}"${autor?' intitle:'+titulo+' inauthor:'+autor:''}`;
+      const qExact = `intitle:"${titulo}"${autor?' inauthor:"'+autor+'"':''}`;
       const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&langRestrict=es&maxResults=5`);
       const d = await r.json();
       const esItem = (d.items||[]).find(item => {
@@ -970,39 +971,41 @@ async function rebuscarMetadatos(id) {
     } catch(e) {}
 
     // ── 3. RESTO DE METADATOS desde Open Library ──
-    const results = await fetchBooks(q);
+    const results = await fetchBooks(titulo + (autor ? ' ' + autor : ''));
     if (results.length) {
       const m = results[0];
       if (!b.año && m.año) b.año = m.año;
-      if (!b.editorial && m.editorial) b.editorial = m.editorial;
       if (!b.isbn && m.isbn) b.isbn = m.isbn;
       if (!b.paginas && m.paginas) b.paginas = m.paginas;
       if (!b.genero && m.genero) b.genero = m.genero;
-      if (m.autor && m.autor.length > 2) b.autor = m.autor;
-      if (gbDescripcion) b.descripcion = gbDescripcion;
-      else if (!b.descripcion && m.olKey) {
+      if (m.editorial) b.editorial = m.editorial;
+
+      if (gbDescripcion) {
+        b.descripcion = gbDescripcion;
+      } else if (m.olKey) {
         try {
           const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
           const wd = await wr.json();
           if (wd.description) b.descripcion = typeof wd.description === 'string' ? wd.description : wd.description.value || '';
+          if (!b.genero && wd.subjects?.length) b.genero = wd.subjects[0];
         } catch(e) {}
       }
 
-      // ── 4. BIO DEL AUTOR: Wikipedia ES primero, fallback Open Library ──
+      // ── 4. BIO DEL AUTOR: Wikipedia ES → Open Library ──
       const autorBio = autor || b.autor || m.autor || '';
       if (autorBio) {
-        // Try Wikipedia in Spanish
+        let bioEncontrada = false;
         try {
           const wikiR = await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(autorBio)}`);
           if (wikiR.ok) {
             const wikiD = await wikiR.json();
-            if (wikiD.extract && wikiD.extract.length > 50) {
+            if (wikiD.extract && wikiD.extract.length > 50 && wikiD.type !== 'disambiguation') {
               b.bio_autor = wikiD.extract;
+              bioEncontrada = true;
             }
           }
         } catch(e) {}
-        // Fallback: Open Library bio
-        if (!b.bio_autor && m.olKey) {
+        if (!bioEncontrada && m.olKey) {
           try {
             const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
             const wd = await wr.json();
@@ -1016,19 +1019,14 @@ async function rebuscarMetadatos(id) {
       }
     }
 
+    // Guardar en Drive con los datos ya limpios y actualizados
     await saveToDrive();
     renderLib();
-    // Forzar refresh de portada — incluso si quedó vacía mostrar placeholder
-    const coverWrap = document.querySelector('#dp-cover-wrap');
-    if (coverWrap) {
-      if (b.portada_url) {
-        coverWrap.innerHTML = `<img src="${b.portada_url}" onerror="this.style.display='none'"><div class="dp-cover-grad"></div><label class="cover-upload-btn">🖼 Cambiar portada<input type="file" accept="image/*" style="display:none" onchange="uploadCover(event,'${b.id}')"></label>`;
-      } else {
-        coverWrap.innerHTML = `<div id="dp-cover-ph">📖</div><div class="dp-cover-grad"></div><label class="cover-upload-btn">🖼 Cambiar portada<input type="file" accept="image/*" style="display:none" onchange="uploadCover(event,'${b.id}')"></label>`;
-      }
-    }
+
+    // Forzar redibujado completo del panel de detalle
     renderDetail(b);
     toast('Metadatos actualizados ✓', 'ok');
+
   } catch(e) {
     toast('Error buscando metadatos', 'err');
   }
