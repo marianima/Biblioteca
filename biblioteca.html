@@ -58,8 +58,10 @@ select option{background:var(--card)}
 .book-card:hover{transform:translateY(-4px)}
 .book-card:hover .bc-img,.book-card:hover .bc-ph{box-shadow:-4px 0 0 rgba(181,116,58,.3),0 12px 32px rgba(60,45,20,.18)}
 .bc-img,.bc-ph{width:100%;aspect-ratio:2/3;border-radius:4px 10px 10px 4px;box-shadow:-4px 0 0 rgba(60,45,20,.15),0 4px 14px rgba(60,45,20,.12);transition:box-shadow .2s;display:block;object-fit:cover;background:var(--bg3)}
-.bc-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--text3);font-size:26px}
-.bc-ph span{font-size:9px;text-align:center;padding:0 8px;line-height:1.3}
+.bc-ph{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:0;color:#fff;font-size:26px;background:linear-gradient(135deg,#8b5e3c 0%,#b5743a 60%,#d4924f 100%);padding:10px 8px 10px;border-left:4px solid rgba(255,255,255,0.25)}
+.bc-ph .bc-ph-title{font-family:'Cormorant Garamond',serif;font-size:11px;font-weight:600;line-height:1.3;color:#fff;text-align:left;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;width:100%}
+.bc-ph .bc-ph-author{font-size:9px;color:rgba(255,255,255,0.75);margin-top:4px;text-align:left;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bc-ph .bc-ph-line{width:24px;height:2px;background:rgba(255,255,255,0.5);margin-bottom:6px}
 .bk-info{padding:8px 2px 0}
 .bk-title{font-family:'Cormorant Garamond',serif;font-size:14px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .bk-author{font-size:11px;color:var(--text3);margin-top:2px}
@@ -751,15 +753,16 @@ function applyFilters(){
 }
 function tipoBadge(b){if(b.tipo==='ambos')return`<span class="badge badge-ambos">📖+💻</span>`;if(b.tipo==='fisico')return`<span class="badge badge-fisico">📖 Físico</span>`;return`<span class="badge badge-ebook">💻 Ebook</span>`;}
 function bookBadges(b){return tipoBadge(b)+(b.coleccion?`<span class="badge badge-coleccion">📚 ${eh(b.coleccion)}</span>`:'')+( b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:'')+( b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="badge" style="background:var(--accent-dim);color:var(--accent)">${eh(b.estante)}</span>`:'')+( b.formato_digital?`<span class="badge" style="background:rgba(109,78,168,.1);color:var(--purple)">${b.formato_digital.toUpperCase()}</span>`:'');}
-function renderGrid(){document.getElementById('books-grid').innerHTML=filtered.map(b=>`<div class="book-card" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}<div class="bc-ph" style="${b.portada_url?'display:none':''}">📖<span>${eh(b.titulo||'')}</span></div><div class="bk-info"><div class="bk-title">${eh(b.titulo||'')}</div><div class="bk-author">${eh(b.autor||'')}</div><div class="bk-badges">${bookBadges(b)}</div></div></div>`).join('');}
-function renderList(){document.getElementById('books-list').innerHTML=filtered.map(b=>`<div class="bli" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph">📖</div>`}<div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:12px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div><div class="bli-meta">${b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="bli-estante">${eh(b.estante)}</span>`:''}${tipoBadge(b)}${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div></div>`).join('');}
+function bookPlaceholder(b, style=''){return`<div class="bc-ph" style="${style}"><div class="bc-ph-line"></div><div class="bc-ph-title">${eh(b.titulo||'')}</div><div class="bc-ph-author">${eh(b.autor||'')}</div></div>`;}
+function renderGrid(){document.getElementById('books-grid').innerHTML=filtered.map(b=>`<div class="book-card" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}${bookPlaceholder(b,b.portada_url?'display:none':'')}<div class="bk-info"><div class="bk-title">${eh(b.titulo||'')}</div><div class="bk-author">${eh(b.autor||'')}</div><div class="bk-badges">${bookBadges(b)}</div></div></div>`).join('');}
+function renderList(){document.getElementById('books-list').innerHTML=filtered.map(b=>`<div class="bli" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}<div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:12px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div><div class="bli-meta">${b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="bli-estante">${eh(b.estante)}</span>`:''}${tipoBadge(b)}${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div></div>`).join('');}
 function renderShelves(){
   const sv=document.getElementById('shelves-view');sv.innerHTML='';
   Object.entries(SHELVES).forEach(([room,{cols,rows}])=>{
     const roomBooks=filtered.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&shelfRoom(b.estante)===room);
     if(!roomBooks.length)return;
     let html=`<div class="shelf-room"><div class="room-title">🏠 ${room}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">`;
-    for(let r=1;r<=rows;r++){cols.forEach(c=>{const sid=`${c}${r}`;const books=roomBooks.filter(b=>b.estante===sid);if(!books.length)return;html+=`<div class="shelf-cell"><div class="shelf-cell-header"><span class="shelf-label">${sid}</span><div class="shelf-cell-actions"><span class="shelf-count">${books.length}</span><button class="btn btn-ghost btn-sm" onclick="showQR('${sid}')" title="Generar QR">QR</button></div></div><div class="shelf-books-row">${books.map(b=>`<div class="book-card" style="width:58px" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}<div class="bc-ph" style="${b.portada_url?'display:none':''}">📖</div><div class="bk-info"><div class="bk-title" style="font-size:10px">${eh(b.titulo||'')}</div></div></div>`).join('')}</div></div>`;});}
+    for(let r=1;r<=rows;r++){cols.forEach(c=>{const sid=`${c}${r}`;const books=roomBooks.filter(b=>b.estante===sid);if(!books.length)return;html+=`<div class="shelf-cell"><div class="shelf-cell-header"><span class="shelf-label">${sid}</span><div class="shelf-cell-actions"><span class="shelf-count">${books.length}</span><button class="btn btn-ghost btn-sm" onclick="showQR('${sid}')" title="Generar QR">QR</button></div></div><div class="shelf-books-row">${books.map(b=>`<div class="book-card" style="width:58px" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}${bookPlaceholder(b,b.portada_url?'display:none':'')}<div class="bk-info"><div class="bk-title" style="font-size:10px">${eh(b.titulo||'')}</div></div></div>`).join('')}</div></div>`;});}
     html+='</div></div>';sv.insertAdjacentHTML('beforeend',html);
   });
   const ebooks=filtered.filter(b=>b.tipo==='ebook');
@@ -819,9 +822,7 @@ function renderDetail(b){
   const digitalSection=hasEbook?(b.epub_url||b.drive_url?`<div class="ds"><div class="dst">📥 VERSIÓN DIGITAL</div>${b.drive_url?`<div class="epub-card"><div class="epub-src">📂 Carpeta en Drive</div><div class="epub-ttl">${eh(b.autor||b.titulo||'')}</div><div class="epub-acts"><a href="${b.drive_url}" target="_blank" class="btn btn-accent btn-sm">📂 Abrir carpeta</a></div></div>`:''} ${b.epub_url?`<div class="epub-card"><div class="epub-src">🌐 Descarga gratuita</div><div class="epub-ttl">${eh(b.titulo||'')}</div><div class="epub-acts"><a href="${b.epub_url}" target="_blank" class="btn btn-ghost btn-sm">⬇ Descargar</a></div></div>`:''}</div>`:`<div class="ds"><div class="dst">📥 EPUB / ARCHIVO DIGITAL</div><div style="display:flex;gap:6px"><input type="text" id="epub-url-inp" placeholder="URL..."><button class="btn btn-ghost btn-sm" onclick="setEpub()">OK</button></div></div>`):'';
 
   document.getElementById('dp-content').innerHTML=`
-    <div id="dp-cover-wrap">
-      ${b.portada_url?`<img src="${b.portada_url}" onerror="this.style.display='none'">`:`<div id="dp-cover-ph">📖</div>`}
-      <div class="dp-cover-grad"></div>
+    <div id="dp-cover-wrap">${b.portada_url?`<img src="${b.portada_url}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`:`<div id="dp-cover-ph" style="background:linear-gradient(135deg,#7a5230 0%,#b5743a 60%,#d4924f 100%);display:flex;flex-direction:column;justify-content:flex-end;padding:24px;"><div style="width:32px;height:3px;background:rgba(255,255,255,.5);margin-bottom:10px"></div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#fff;line-height:1.2;margin-bottom:6px">${eh(b.titulo||'')}</div><div style="font-size:13px;color:rgba(255,255,255,.75)">${eh(b.autor||'')}</div></div>`}<div class="dp-cover-grad"></div>
       <label class="cover-upload-btn">🖼 Cambiar portada<input type="file" accept="image/*" style="display:none" onchange="uploadCover(event,'${b.id}')"></label>
     </div>
     <div class="dp-title">${eh(b.titulo||'')}</div>
@@ -900,6 +901,8 @@ async function rebuscarMetadatos(id) {
     if (autor) b.autor = autor;
 
     // Guardar inmediatamente con datos limpios
+    // IMPORTANTE: solo limpiar descripción si vamos a reemplazarla — guardar la anterior como backup
+    const descripcionAnterior = b.descripcion || '';
     await saveToDrive();
 
     // PASO 1: Portada via Open Library (más confiable para literatura)
@@ -959,7 +962,8 @@ async function rebuscarMetadatos(id) {
       } catch(e) {}
     }
 
-    // PASO 5: Bio del autor via Wikipedia ES
+    // Si no encontramos descripción nueva, restaurar la anterior
+    if (!b.descripcion && descripcionAnterior) b.descripcion = descripcionAnterior;
     if (autor || b.autor) {
       try {
         const wikiR = await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(autor||b.autor)}`);
