@@ -842,8 +842,12 @@ function renderDetail(b){
       <div class="mi"><div class="mk">Páginas</div><div class="mv">${b.paginas||'—'}</div></div>
       <div class="mi"><div class="mk">Editorial</div><div class="mv">${eh(b.editorial||'—')}</div></div>
       <div class="mi"><div class="mk">Idioma</div><div class="mv">${eh(b.idioma||'—')}</div></div>
-      ${b.isbn?`<div class="mi"><div class="mk">ISBN</div><div class="mv">${eh(b.isbn)}</div></div>`:''}
       ${b.genero?`<div class="mi"><div class="mk">Género</div><div class="mv">${eh(b.genero)}</div></div>`:''}
+      <div class="mi" style="grid-column:1/-1"><div class="mk">ISBN</div>
+        <div class="mv"><input type="text" value="${eh(b.isbn||'')}" placeholder="Sin ISBN"
+          style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px"
+          onchange="updField('isbn',this.value)" oninput="markUnsaved()"></div>
+      </div>
       ${locationFields}
     </div>
     <div class="ds"><div class="dst">📝 DESCRIPCIÓN / TEMÁTICA <span style="color:var(--text3);font-size:9px">EDITABLE</span></div>
@@ -893,17 +897,19 @@ async function rebuscarMetadatos(id) {
   const autor = prompt('Autor (opcional):', b.autor || '');
   toast('Buscando metadatos...', 'info');
   try {
-    // PASO 0: Limpiar todo lo incorrecto PRIMERO
+    // PASO 0: Limpiar todo lo incorrecto PRIMERO y guardar en Drive
     b.portada_url = '';
     b.descripcion = '';
     b.isbn = '';
     b.titulo = titulo;
     if (autor) b.autor = autor;
+    const descripcionAnterior = '';
 
-    // Guardar inmediatamente con datos limpios
-    // IMPORTANTE: solo limpiar descripción si vamos a reemplazarla — guardar la anterior como backup
-    const descripcionAnterior = b.descripcion || '';
+    // Guardar inmediatamente — esto elimina la portada base64 de Drive
     await saveToDrive();
+    // Redibujar el panel con portada limpia para que el usuario vea el cambio
+    renderDetail(b);
+    document.getElementById('dp-content').parentElement.scrollTop = 0;
 
     // PASO 1: Portada via Open Library (más confiable para literatura)
     let newCover = '';
