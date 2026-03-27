@@ -941,6 +941,12 @@ async function rebuscarMetadatos(id) {
       } catch(e) {}
     }
 
+    // Limpiar portada base64 incrustada del archivo antes de asignar la nueva
+    // (las base64 empiezan con "data:" y suelen ser portadas del propio EPUB, que pueden ser incorrectas)
+    if (b.portada_url && b.portada_url.startsWith('data:')) {
+      b.portada_url = '';
+    }
+
     if (newCover) {
       b.portada_url = newCover + '?t=' + Date.now();
       toast(`Portada encontrada: "${foundTitle}"`, 'info');
@@ -948,16 +954,17 @@ async function rebuscarMetadatos(id) {
       toast('No se encontró portada confiable. Podés subirla manualmente con "🖼 Cambiar portada".', 'info');
     }
 
-    // ── 2. DESCRIPCIÓN EN ESPAÑOL ──
+    // ── 2. DESCRIPCIÓN EN ESPAÑOL — usar SOLO título+autor ingresados ──
     let gbDescripcion = '';
     try {
-      const qExact = b.isbn ? `isbn:${b.isbn}` : `"${titulo}"${autor?' '+autor:''}`;
-      const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&langRestrict=es&maxResults=3`);
+      // Nunca usar b.descripcion como fuente — solo el título y autor que el usuario confirmó
+      const qExact = b.isbn ? `isbn:${b.isbn}` : `"${titulo}"${autor?' intitle:'+titulo+' inauthor:'+autor:''}`;
+      const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&langRestrict=es&maxResults=5`);
       const d = await r.json();
       const esItem = (d.items||[]).find(item => {
         const lang = item.volumeInfo?.language || '';
         const t = item.volumeInfo?.title || '';
-        return (lang === 'es' || lang === '') && similarityScore(t, titulo) > 0.5;
+        return (lang === 'es' || lang === '') && similarityScore(t, titulo) > 0.55;
       });
       if (esItem?.volumeInfo?.description) gbDescripcion = esItem.volumeInfo.description;
     } catch(e) {}
@@ -1011,8 +1018,15 @@ async function rebuscarMetadatos(id) {
 
     await saveToDrive();
     renderLib();
-    const coverImg = document.querySelector('#dp-cover-wrap img');
-    if (coverImg && b.portada_url) coverImg.src = b.portada_url;
+    // Forzar refresh de portada — incluso si quedó vacía mostrar placeholder
+    const coverWrap = document.querySelector('#dp-cover-wrap');
+    if (coverWrap) {
+      if (b.portada_url) {
+        coverWrap.innerHTML = `<img src="${b.portada_url}" onerror="this.style.display='none'"><div class="dp-cover-grad"></div><label class="cover-upload-btn">🖼 Cambiar portada<input type="file" accept="image/*" style="display:none" onchange="uploadCover(event,'${b.id}')"></label>`;
+      } else {
+        coverWrap.innerHTML = `<div id="dp-cover-ph">📖</div><div class="dp-cover-grad"></div><label class="cover-upload-btn">🖼 Cambiar portada<input type="file" accept="image/*" style="display:none" onchange="uploadCover(event,'${b.id}')"></label>`;
+      }
+    }
     renderDetail(b);
     toast('Metadatos actualizados ✓', 'ok');
   } catch(e) {
