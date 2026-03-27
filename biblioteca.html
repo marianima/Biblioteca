@@ -894,72 +894,123 @@ async function rebuscarMetadatos(id) {
   try {
     const q = titulo + (autor ? ' ' + autor : '');
 
-    // 1. Try Google Books in Spanish first (better descriptions in Spanish)
+    // ── 1. PORTADA: cascada ISBN → OL exacto → GB comillas + validación ──
+    let newCover = '';
+    let foundTitle = '';
+
+    // A) ISBN primero — resultado exacto garantizado
+    if (b.isbn) {
+      try {
+        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${b.isbn}&maxResults=1`);
+        const d = await r.json();
+        const info = d.items?.[0]?.volumeInfo;
+        if (info?.imageLinks?.thumbnail) {
+          newCover = info.imageLinks.thumbnail.replace('http:','https:').replace('zoom=1','zoom=3');
+          foundTitle = info.title || '';
+        }
+      } catch(e) {}
+    }
+
+    // B) Open Library cover by exact title+author (more precise than Google for Spanish)
+    if (!newCover) {
+      try {
+        const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(titulo)}&author=${encodeURIComponent(autor||'')}&limit=3&fields=key,title,cover_i`);
+        const d = await r.json();
+        const best = (d.docs||[]).find(doc => similarityScore(doc.title||'', titulo) > 0.6);
+        if (best?.cover_i) {
+          newCover = `https://covers.openlibrary.org/b/id/${best.cover_i}-L.jpg`;
+          foundTitle = best.title || '';
+        }
+      } catch(e) {}
+    }
+
+    // C) Google Books con título entre comillas + autor
+    if (!newCover) {
+      try {
+        const qExact = `"${titulo}"${autor?' '+autor:''}`;
+        const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&langRestrict=es&maxResults=3`);
+        const d = await r.json();
+        const best = (d.items||[]).find(item => {
+          const t = item.volumeInfo?.title || '';
+          return similarityScore(t, titulo) > 0.6;
+        });
+        if (best?.volumeInfo?.imageLinks?.thumbnail) {
+          newCover = best.volumeInfo.imageLinks.thumbnail.replace('http:','https:').replace('zoom=1','zoom=3');
+          foundTitle = best.volumeInfo.title || '';
+        }
+      } catch(e) {}
+    }
+
+    if (newCover) {
+      b.portada_url = newCover + '?t=' + Date.now();
+      toast(`Portada encontrada: "${foundTitle}"`, 'info');
+    } else {
+      toast('No se encontró portada confiable. Podés subirla manualmente con "🖼 Cambiar portada".', 'info');
+    }
+
+    // ── 2. DESCRIPCIÓN EN ESPAÑOL ──
     let gbDescripcion = '';
-    let gbCover = '';
     try {
-      const gbR = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=3`);
-      const gbD = await gbR.json();
-      const esItems = (gbD.items || []).filter(item => {
+      const qExact = b.isbn ? `isbn:${b.isbn}` : `"${titulo}"${autor?' '+autor:''}`;
+      const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qExact)}&langRestrict=es&maxResults=3`);
+      const d = await r.json();
+      const esItem = (d.items||[]).find(item => {
         const lang = item.volumeInfo?.language || '';
-        return lang === 'es' || lang === '';
+        const t = item.volumeInfo?.title || '';
+        return (lang === 'es' || lang === '') && similarityScore(t, titulo) > 0.5;
       });
-      if (esItems.length) {
-        const info = esItems[0].volumeInfo || {};
-        if (info.description) gbDescripcion = info.description;
-        if (info.imageLinks?.thumbnail) gbCover = info.imageLinks.thumbnail.replace('http:', 'https:').replace('zoom=1', 'zoom=3');
-      }
+      if (esItem?.volumeInfo?.description) gbDescripcion = esItem.volumeInfo.description;
     } catch(e) {}
 
-    // 2. Open Library for structured metadata + author bio
+    // ── 3. RESTO DE METADATOS desde Open Library ──
     const results = await fetchBooks(q);
-    if (!results.length && !gbDescripcion) { toast('No se encontraron resultados', 'err'); return; }
-
     if (results.length) {
       const m = results[0];
-      // Update cover: prefer higher res Google Books cover, fallback to Open Library
-      const newCover = gbCover || (m.cover ? m.cover.replace('-M.jpg', '-L.jpg') : '');
-      if (newCover) b.portada_url = newCover + '?t=' + Date.now(); // cache buster
-      if (m.titulo && m.titulo.length > 2) b.titulo = m.titulo;
+      if (!b.año && m.año) b.año = m.año;
+      if (!b.editorial && m.editorial) b.editorial = m.editorial;
+      if (!b.isbn && m.isbn) b.isbn = m.isbn;
+      if (!b.paginas && m.paginas) b.paginas = m.paginas;
+      if (!b.genero && m.genero) b.genero = m.genero;
       if (m.autor && m.autor.length > 2) b.autor = m.autor;
-      if (m.año) b.año = m.año;
-      if (m.editorial) b.editorial = m.editorial;
-      if (m.isbn) b.isbn = m.isbn;
-      if (m.paginas) b.paginas = m.paginas;
-      if (m.genero) b.genero = m.genero;
-      if (m.idioma) b.idioma = m.idioma || 'es';
-
-      // Use Spanish description (Google Books ES) or Open Library
-      if (gbDescripcion) {
-        b.descripcion = gbDescripcion;
-      } else if (m.olKey) {
+      if (gbDescripcion) b.descripcion = gbDescripcion;
+      else if (!b.descripcion && m.olKey) {
         try {
           const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
           const wd = await wr.json();
           if (wd.description) b.descripcion = typeof wd.description === 'string' ? wd.description : wd.description.value || '';
-          if (wd.subjects?.length && !b.genero) b.genero = wd.subjects[0];
         } catch(e) {}
       }
-      // Author bio from Open Library
-      if (m.olKey) {
+
+      // ── 4. BIO DEL AUTOR: Wikipedia ES primero, fallback Open Library ──
+      const autorBio = autor || b.autor || m.autor || '';
+      if (autorBio) {
+        // Try Wikipedia in Spanish
         try {
-          const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
-          const wd = await wr.json();
-          if (wd.authors?.length) {
-            const ar = await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);
-            const ad = await ar.json();
-            if (ad.bio) b.bio_autor = typeof ad.bio === 'string' ? ad.bio : ad.bio.value || '';
+          const wikiR = await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(autorBio)}`);
+          if (wikiR.ok) {
+            const wikiD = await wikiR.json();
+            if (wikiD.extract && wikiD.extract.length > 50) {
+              b.bio_autor = wikiD.extract;
+            }
           }
         } catch(e) {}
+        // Fallback: Open Library bio
+        if (!b.bio_autor && m.olKey) {
+          try {
+            const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
+            const wd = await wr.json();
+            if (wd.authors?.length) {
+              const ar = await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);
+              const ad = await ar.json();
+              if (ad.bio) b.bio_autor = typeof ad.bio === 'string' ? ad.bio : ad.bio.value || '';
+            }
+          } catch(e) {}
+        }
       }
-    } else if (gbCover) {
-      b.portada_url = gbCover + '?t=' + Date.now();
-      if (gbDescripcion) b.descripcion = gbDescripcion;
     }
 
     await saveToDrive();
     renderLib();
-    // Force cover refresh in detail panel
     const coverImg = document.querySelector('#dp-cover-wrap img');
     if (coverImg && b.portada_url) coverImg.src = b.portada_url;
     renderDetail(b);
@@ -967,6 +1018,21 @@ async function rebuscarMetadatos(id) {
   } catch(e) {
     toast('Error buscando metadatos', 'err');
   }
+}
+
+// Similarity score between two strings (0 to 1)
+function similarityScore(a, b) {
+  const na = (a||'').toLowerCase().replace(/[^a-z0-9áéíóúñü\s]/g,'').trim();
+  const nb = (b||'').toLowerCase().replace(/[^a-z0-9áéíóúñü\s]/g,'').trim();
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  if (na.includes(nb) || nb.includes(na)) return 0.85;
+  // Word overlap
+  const wa = new Set(na.split(/\s+/));
+  const wb = new Set(nb.split(/\s+/));
+  const intersection = [...wa].filter(w => wb.has(w)).length;
+  const union = new Set([...wa, ...wb]).size;
+  return intersection / union;
 }
 
 function promptAddOtherFormat(id){const b=library.find(x=>x.id===id);if(!b)return;if(b.tipo==='fisico'){openAdd();switchTab('digital');toast(`Subí el archivo para unificarlo con "${b.titulo}"`, 'info');window._pendingMergeId=id;}else{const shelf=prompt('Estante para la versión física (ej: B3):');if(shelf){b.tipo='ambos';b.estante=shelf.toUpperCase();saveCurrent();toast('Versión física agregada ✓','ok');}}}
