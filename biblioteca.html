@@ -8,14 +8,7 @@
 <script src="https://apis.google.com/js/api.js" async defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-:root {
-  --bg:#0c0b0e; --bg2:#13111a; --bg3:#1c1826; --card:#16131f;
-  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
-  --accent:#c9a96e; --accent2:#e8c98a; --accent-dim:rgba(201,169,110,0.13);
-  --text:#f0ece4; --text2:#a09890; --text3:#6a6060;
-  --red:#e07070; --green:#70c490; --blue:#70a8e0; --purple:#a07ee0;
-  --radius:12px; --shadow:0 8px 32px rgba(0,0,0,0.55);
-}
+:root{--bg:#0c0b0e;--bg2:#13111a;--bg3:#1c1826;--card:#16131f;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--accent:#c9a96e;--accent2:#e8c98a;--accent-dim:rgba(201,169,110,0.13);--text:#f0ece4;--text2:#a09890;--text3:#6a6060;--red:#e07070;--green:#70c490;--blue:#70a8e0;--purple:#a07ee0;--radius:12px;--shadow:0 8px 32px rgba(0,0,0,0.55)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;overflow-x:hidden}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
@@ -74,6 +67,7 @@ select option{background:var(--bg3)}
 .badge-leído{background:rgba(112,196,144,.13);color:var(--green)}
 .badge-leyendo{background:rgba(201,169,110,.13);color:var(--accent)}
 .badge-pendiente{background:rgba(106,96,96,.15);color:var(--text3)}
+.badge-coleccion{background:rgba(160,126,224,.13);color:var(--purple)}
 #books-list{display:flex;flex-direction:column;gap:7px}
 .bli{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;cursor:pointer;transition:all .14s}
 .bli:hover{border-color:var(--border2);background:var(--bg3)}
@@ -89,7 +83,7 @@ select option{background:var(--bg3)}
 .shelf-name{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .shelf-name::after{content:'';flex:1;height:1px;background:var(--border)}
 .shelf-books{display:flex;flex-wrap:wrap;gap:14px}
-#detail-panel{width:350px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;display:none;flex-direction:column}
+#detail-panel{width:360px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;display:none;flex-direction:column}
 #detail-panel.open{display:flex}
 #dp-header{position:sticky;top:0;z-index:10;background:var(--bg2);border-bottom:1px solid var(--border);padding:11px 15px;display:flex;align-items:center;justify-content:space-between}
 #dp-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:17px}
@@ -176,9 +170,9 @@ select option{background:var(--bg3)}
 .dz-iinfo{flex:1;min-width:0}
 .dz-iname{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dz-imeta{font-size:11px;color:var(--text3);margin-top:1px}
-.dz-ok{color:var(--green);font-size:11px}
-.dz-load{color:var(--accent);font-size:11px}
-.dz-err{color:var(--red);font-size:11px}
+.dz-ok{color:var(--green);font-size:11px;flex-shrink:0}
+.dz-load{color:var(--accent);font-size:11px;flex-shrink:0}
+.dz-err{color:var(--red);font-size:11px;flex-shrink:0}
 #toasts{position:fixed;bottom:18px;right:18px;z-index:500;display:flex;flex-direction:column;gap:7px;pointer-events:none}
 .toast{padding:9px 14px;border-radius:9px;font-size:13px;backdrop-filter:blur(12px);border:1px solid;animation:tIn .22s ease;pointer-events:auto;display:flex;align-items:center;gap:7px;min-width:200px;box-shadow:var(--shadow)}
 .t-ok{background:rgba(112,196,144,.13);border-color:rgba(112,196,144,.28);color:var(--green)}
@@ -203,6 +197,8 @@ select option{background:var(--bg3)}
 #fab:hover{transform:scale(1.08)}
 .spin{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
 @media(max-width:768px){#sidebar{display:none}#detail-panel{position:fixed;bottom:0;left:0;right:0;width:100%;height:80vh;z-index:150;border-radius:14px 14px 0 0;border:1px solid var(--border2)}#fab{display:flex}#header .btn-accent{display:none}}
 </style>
 </head>
@@ -239,7 +235,7 @@ select option{background:var(--bg3)}
   <div id="logo">📚 <em>Mi</em> Biblioteca</div>
   <div id="search-wrap">
     <span class="si">🔍</span>
-    <input type="text" id="search-input" placeholder="Buscar título, autor, descripción..." oninput="debSearch()">
+    <input type="text" id="search-input" placeholder="Buscar título, autor, colección..." oninput="debSearch()">
   </div>
   <div id="header-right">
     <div id="user-badge" style="display:none"><span id="user-name"></span></div>
@@ -271,13 +267,20 @@ select option{background:var(--bg3)}
       <div class="filter-group"><label class="filter-label">Estado</label>
         <select id="f-estado" onchange="applyFilters()"><option value="">Todos</option><option value="leído">Leído</option><option value="leyendo">Leyendo</option><option value="pendiente">Pendiente</option></select>
       </div>
-      <div class="filter-group"><label class="filter-label">Estante</label><select id="f-estante" onchange="applyFilters()"></select></div>
-      <div class="filter-group"><label class="filter-label">Género</label><select id="f-genero" onchange="applyFilters()"></select></div>
+      <div class="filter-group"><label class="filter-label">Estante (1-30)</label>
+        <select id="f-estante" onchange="applyFilters()"></select>
+      </div>
+      <div class="filter-group"><label class="filter-label">Colección</label>
+        <select id="f-coleccion" onchange="applyFilters()"></select>
+      </div>
+      <div class="filter-group"><label class="filter-label">Género</label>
+        <select id="f-genero" onchange="applyFilters()"></select>
+      </div>
       <div class="filter-group"><label class="filter-label">Formato digital</label>
         <select id="f-formato" onchange="applyFilters()"><option value="">Todos</option><option value="epub">EPUB</option><option value="pdf">PDF</option><option value="azw3">AZW3</option><option value="mobi">MOBI</option></select>
       </div>
       <div class="filter-group"><label class="filter-label">Ordenar</label>
-        <select id="f-sort" onchange="applyFilters()"><option value="fecha">Fecha agregado</option><option value="titulo">Título A-Z</option><option value="autor">Autor</option><option value="año">Año</option></select>
+        <select id="f-sort" onchange="applyFilters()"><option value="fecha">Fecha agregado</option><option value="titulo">Título A-Z</option><option value="autor">Autor</option><option value="coleccion">Colección</option><option value="año">Año</option></select>
       </div>
       <button class="btn btn-ghost btn-sm" style="width:100%" onclick="clearFilters()">✕ Limpiar</button>
     </div>
@@ -311,6 +314,7 @@ select option{background:var(--bg3)}
   </div>
 </div>
 
+<!-- ADD MODAL -->
 <div class="mo" id="add-modal">
   <div class="modal">
     <div class="mh"><div class="mt">Agregar libro</div><button class="mc" onclick="closeAdd()">✕</button></div>
@@ -322,6 +326,7 @@ select option{background:var(--bg3)}
         <button class="tab-btn" onclick="switchTab('manual')" id="tab-manual">✏️ Manual</button>
       </div>
 
+      <!-- SEARCH -->
       <div id="tc-search">
         <div class="fr"><label class="fl">Título, autor o ISBN</label>
           <input type="text" id="modal-q" placeholder="Ej: Cien años de soledad, Borges, 978..." oninput="debBookSearch()">
@@ -333,8 +338,9 @@ select option{background:var(--bg3)}
         </div>
       </div>
 
+      <!-- CAMERA -->
       <div id="tc-camera" style="display:none">
-        <p style="color:var(--text3);font-size:12px;margin-bottom:10px">Sacá una foto de la portada y escribí el título o ISBN para buscar el libro.</p>
+        <p style="color:var(--text3);font-size:12px;margin-bottom:10px">Sacá una foto de la portada y escribí el título o ISBN para buscar.</p>
         <video id="cam-video" autoplay playsinline></video>
         <canvas id="cam-canvas" style="display:none"></canvas>
         <img id="cam-photo">
@@ -344,9 +350,7 @@ select option{background:var(--bg3)}
           <label class="btn btn-ghost btn-sm" style="cursor:pointer">🖼 Subir imagen<input type="file" accept="image/*" style="display:none" onchange="loadPhotoFile(event)"></label>
         </div>
         <div id="cam-isbn-row" style="display:none">
-          <div class="fr"><label class="fl">Título o ISBN (editá si es necesario)</label>
-            <input type="text" id="cam-q" placeholder="Ingresá el título o ISBN">
-          </div>
+          <div class="fr"><label class="fl">Título o ISBN</label><input type="text" id="cam-q" placeholder="Ingresá el título o ISBN"></div>
           <button class="btn btn-accent btn-sm" style="width:100%" onclick="searchFromCam()">🔍 Buscar</button>
         </div>
         <div id="cam-results-wrap" style="display:none;margin-top:12px">
@@ -355,8 +359,12 @@ select option{background:var(--bg3)}
         </div>
       </div>
 
+      <!-- DIGITAL FILES -->
       <div id="tc-digital" style="display:none">
-        <p style="color:var(--text3);font-size:12px;margin-bottom:12px">Arrastrá uno o varios archivos. Se extraen los metadatos automáticamente y se busca info en línea.</p>
+        <p style="color:var(--text3);font-size:12px;margin-bottom:12px">Arrastrá archivos digitales. Se suben a tu Drive en <strong style="color:var(--accent)">Mi Biblioteca - EPUBs/[Autor]</strong> y se buscan los metadatos automáticamente.</p>
+        <div id="drive-folder-info" style="display:none;background:var(--bg3);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--text2)">
+          📁 Carpeta Drive: <span id="drive-folder-link" style="color:var(--accent)"></span>
+        </div>
         <div id="drop-zone" onclick="document.getElementById('dz-input').click()"
           ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
           <span class="dz-icon">📚</span>
@@ -370,6 +378,7 @@ select option{background:var(--bg3)}
         </div>
       </div>
 
+      <!-- MANUAL -->
       <div id="tc-manual" style="display:none">
         <div class="fg">
           <div class="fr"><label class="fl">Título *</label><input type="text" id="m-titulo"></div>
@@ -382,12 +391,23 @@ select option{background:var(--bg3)}
           <div class="fr"><label class="fl">Páginas</label><input type="number" id="m-paginas"></div>
         </div>
         <div class="fr"><label class="fl">Tipo</label>
-          <select id="m-tipo"><option value="fisico">📖 Físico</option><option value="ebook">💻 Ebook</option></select>
+          <select id="m-tipo" onchange="toggleManualFields()">
+            <option value="fisico">📖 Físico</option>
+            <option value="ebook">💻 Ebook</option>
+          </select>
         </div>
-        <div class="fr"><label class="fl">Estante</label><input type="text" id="m-estante" placeholder="Ej: A-2"></div>
+        <div id="m-fisico-fields">
+          <div class="fr"><label class="fl">Estante (1-30)</label>
+            <input type="number" id="m-estante" min="1" max="30" placeholder="Ej: 5">
+          </div>
+          <div class="fr"><label class="fl">Colección</label>
+            <input type="text" id="m-coleccion" placeholder="Ej: Harry Potter">
+          </div>
+        </div>
         <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="addManual()">✅ Agregar a mi biblioteca</button>
       </div>
 
+      <!-- SELECTED PREVIEW -->
       <div id="sel-preview">
         <div class="sp-div"></div>
         <div class="sp-top">
@@ -395,10 +415,18 @@ select option{background:var(--bg3)}
           <div><div id="prev-title"></div><div id="prev-author"></div><div id="prev-meta"></div></div>
         </div>
         <div class="fr"><label class="fl">Tipo</label>
-          <select id="prev-tipo"><option value="fisico">📖 Físico</option><option value="ebook">💻 Ebook</option></select>
+          <select id="prev-tipo" onchange="togglePreviewFields()">
+            <option value="fisico">📖 Físico</option>
+            <option value="ebook">💻 Ebook</option>
+          </select>
         </div>
-        <div class="fr"><label class="fl">Estante (opcional)</label>
-          <input type="text" id="prev-estante" placeholder="Ej: A-2">
+        <div id="prev-fisico-fields">
+          <div class="fr"><label class="fl">Estante (1-30)</label>
+            <input type="number" id="prev-estante" min="1" max="30" placeholder="Ej: 5">
+          </div>
+          <div class="fr"><label class="fl">Colección (si aplica)</label>
+            <input type="text" id="prev-coleccion" placeholder="Ej: Harry Potter">
+          </div>
         </div>
         <div id="epub-result" style="margin-top:10px"></div>
         <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="addSelected()">✅ Agregar a mi biblioteca</button>
@@ -409,12 +437,15 @@ select option{background:var(--bg3)}
 
 <script>
 const CLIENT_ID='665826206801-un042lvukjcpn0nd042v0splvmm07vtc.apps.googleusercontent.com';
+const EPUB_FOLDER_NAME='Mi Biblioteca - EPUBs';
 let library=[],filtered=[],selBookId=null;
 let driveFileId=null,accessToken=null,tokenClient=null;
+let epubFolderId=null; // root epub folder
 let pendingChanges=false,confirmCb=null;
 let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null;
 
+// ── INIT ──────────────────────────────────────────────────
 window.onload=()=>{
   localStorage.setItem('lib_cid',localStorage.getItem('lib_cid')||CLIENT_ID);
   const cid=localStorage.getItem('lib_cid');
@@ -422,17 +453,18 @@ window.onload=()=>{
   loadLocal();renderLib();
   setTimeout(()=>initGIS(cid),800);
 };
-
 function saveClientId(){const v=document.getElementById('setup-cid').value.trim();if(!v){toast('Ingresá un Client ID válido','err');return;}localStorage.setItem('lib_cid',v);document.getElementById('setup').classList.remove('show');loadLocal();renderLib();setTimeout(()=>initGIS(v),500);}
 function skipSetup(){localStorage.setItem('lib_cid','__skip__');document.getElementById('setup').classList.remove('show');document.getElementById('off-banner').classList.add('show');loadLocal();renderLib();}
 function loadLocal(){try{library=JSON.parse(localStorage.getItem('lib_data')||'[]');}catch(e){library=[];}}
 function saveLocal(){localStorage.setItem('lib_data',JSON.stringify(library));}
 
+// ── GOOGLE IDENTITY ────────────────────────────────────────
 function initGIS(cid){
   if(cid==='__skip__')return;
   try{
     tokenClient=google.accounts.oauth2.initTokenClient({
-      client_id:cid, scope:'https://www.googleapis.com/auth/drive.file',
+      client_id:cid,
+      scope:'https://www.googleapis.com/auth/drive.file',
       callback:async(r)=>{
         if(r.error){toast('Error Drive: '+r.error,'err');return;}
         accessToken=r.access_token;
@@ -442,26 +474,32 @@ function initGIS(cid){
         document.getElementById('user-name').textContent='☁ Drive';
         document.getElementById('off-banner').classList.remove('show');
         await loadFromDrive();
+        await ensureEpubFolder();
       }
     });
-  }catch(e){console.warn('GIS init',e);}
+  }catch(e){console.warn('GIS',e);}
 }
 function connectDrive(){if(!tokenClient){toast('Client ID no configurado','err');return;}tokenClient.requestAccessToken();}
 
+// ── DRIVE CORE ─────────────────────────────────────────────
 async function driveReq(url,method='GET',body=null,hdrs={}){
   const r=await fetch(url,{method,headers:{'Authorization':'Bearer '+accessToken,...hdrs},...(body?{body}:{})});
   if(!r.ok)throw new Error('Drive '+r.status);return r;
 }
+
 async function loadFromDrive(){
   toast('Cargando desde Drive...','info');
   try{
-    const r=await driveReq('https://www.googleapis.com/drive/v3/files?q=name%3D%22biblioteca.json%22&spaces=drive&fields=files(id)');
+    const r=await driveReq('https://www.googleapis.com/drive/v3/files?q=name%3D%22biblioteca.json%22+and+trashed%3Dfalse&spaces=drive&fields=files(id)');
     const d=await r.json();
     if(d.files?.length){
       driveFileId=d.files[0].id;
       const fr=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-      library=await fr.json();saveLocal();renderLib();toast(`${library.length} libros cargados ✓`,'ok');
-    }else{await createDriveFile();toast('Archivo nuevo creado en Drive','ok');}
+      library=await fr.json();saveLocal();renderLib();
+      toast(`${library.length} libros cargados ✓`,'ok');
+    }else{
+      await createDriveFile();toast('Archivo nuevo creado en Drive','ok');
+    }
   }catch(e){toast('Error Drive. Usando datos locales.','err');document.getElementById('off-banner').classList.add('show');}
 }
 async function createDriveFile(){
@@ -475,25 +513,109 @@ async function saveToDrive(){
   if(!accessToken||!driveFileId){saveLocal();return;}
   try{
     await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,'PATCH',JSON.stringify(library),{'Content-Type':'application/json'});
-    saveLocal();pendingChanges=false;document.getElementById('unsaved-bar').classList.remove('show');toast('Guardado en Drive ✓','ok');
+    saveLocal();pendingChanges=false;
+    document.getElementById('unsaved-bar').classList.remove('show');
+    toast('Guardado en Drive ✓','ok');
   }catch(e){saveLocal();toast('Error guardando en Drive','err');}
 }
 
+// ── EPUB FOLDER MANAGEMENT ─────────────────────────────────
+async function ensureEpubFolder(){
+  if(!accessToken)return;
+  try{
+    const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=name%3D%22${encodeURIComponent(EPUB_FOLDER_NAME)}%22+and+mimeType%3D%22application%2Fvnd.google-apps.folder%22+and+trashed%3Dfalse&fields=files(id,name)`);
+    const d=await r.json();
+    if(d.files?.length){
+      epubFolderId=d.files[0].id;
+    }else{
+      const meta={name:EPUB_FOLDER_NAME,mimeType:'application/vnd.google-apps.folder'};
+      const cr=await driveReq('https://www.googleapis.com/drive/v3/files','POST',JSON.stringify(meta),{'Content-Type':'application/json'});
+      const cd=await cr.json();epubFolderId=cd.id;
+      toast(`Carpeta "${EPUB_FOLDER_NAME}" creada en Drive`,'ok');
+    }
+    // Show folder info in digital tab
+    document.getElementById('drive-folder-info').style.display='block';
+    document.getElementById('drive-folder-link').textContent=EPUB_FOLDER_NAME;
+  }catch(e){console.warn('Epub folder error',e);}
+}
+
+async function ensureAuthorFolder(autorName){
+  if(!accessToken||!epubFolderId)return null;
+  const safe=autorName||'Sin autor';
+  try{
+    const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=name%3D%22${encodeURIComponent(safe)}%22+and+%22${epubFolderId}%22+in+parents+and+mimeType%3D%22application%2Fvnd.google-apps.folder%22+and+trashed%3Dfalse&fields=files(id)`);
+    const d=await r.json();
+    if(d.files?.length)return d.files[0].id;
+    const meta={name:safe,mimeType:'application/vnd.google-apps.folder',parents:[epubFolderId]};
+    const cr=await driveReq('https://www.googleapis.com/drive/v3/files','POST',JSON.stringify(meta),{'Content-Type':'application/json'});
+    return (await cr.json()).id;
+  }catch(e){return epubFolderId;}
+}
+
+async function uploadFileToDrive(file, autorName, onProgress){
+  if(!accessToken){toast('Conectá Drive para subir archivos','err');return null;}
+  if(!epubFolderId)await ensureEpubFolder();
+  const folderId=await ensureAuthorFolder(autorName)||epubFolderId;
+  try{
+    // Create file metadata
+    const meta={name:file.name,parents:[folderId]};
+    // Use resumable upload for progress
+    const initR=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+accessToken,'Content-Type':'application/json','X-Upload-Content-Type':file.type||'application/octet-stream','X-Upload-Content-Length':file.size},
+      body:JSON.stringify(meta)
+    });
+    const uploadUrl=initR.headers.get('Location');
+    if(!uploadUrl)throw new Error('No upload URL');
+    // Upload with XHR for progress
+    return new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      xhr.open('PUT',uploadUrl);
+      xhr.setRequestHeader('Authorization','Bearer '+accessToken);
+      xhr.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(Math.round(e.loaded/e.total*100));};
+      xhr.onload=()=>{
+        if(xhr.status>=200&&xhr.status<300){
+          const d=JSON.parse(xhr.responseText);
+          resolve({id:d.id,url:`https://drive.google.com/file/d/${d.id}/view`,folderId});
+        }else reject(new Error('Upload failed '+xhr.status));
+      };
+      xhr.onerror=()=>reject(new Error('Network error'));
+      xhr.send(file);
+    });
+  }catch(e){console.error(e);return null;}
+}
+
+// ── RENDER ─────────────────────────────────────────────────
 function renderLib(){applyFilters();updateDropdowns();}
 function applyFilters(){
   const q=(document.getElementById('search-input').value||'').toLowerCase();
   const tipo=document.getElementById('f-tipo').value,estado=document.getElementById('f-estado').value;
   const est=document.getElementById('f-estante').value,gen=document.getElementById('f-genero').value;
-  const fmt=document.getElementById('f-formato').value,sort=document.getElementById('f-sort').value;
+  const fmt=document.getElementById('f-formato').value,col=document.getElementById('f-coleccion').value;
+  const sort=document.getElementById('f-sort').value;
   filtered=library.filter(b=>{
-    const mQ=!q||[b.titulo,b.autor,b.descripcion,b.mis_comentarios,b.genero].some(f=>f&&f.toLowerCase().includes(q));
-    return mQ&&(!tipo||b.tipo===tipo)&&(!estado||b.estado===estado)&&(!est||b.estante===est)&&(!gen||b.genero===gen)&&(!fmt||b.formato_digital===fmt);
+    const mQ=!q||[b.titulo,b.autor,b.descripcion,b.mis_comentarios,b.genero,b.coleccion].some(f=>f&&f.toLowerCase().includes(q));
+    return mQ&&(!tipo||b.tipo===tipo)&&(!estado||b.estado===estado)&&(!est||String(b.estante)===est)&&(!gen||b.genero===gen)&&(!fmt||b.formato_digital===fmt)&&(!col||b.coleccion===col);
   });
-  filtered.sort((a,b)=>sort==='titulo'?(a.titulo||'').localeCompare(b.titulo||''):sort==='autor'?(a.autor||'').localeCompare(b.autor||''):sort==='año'?(b.año||0)-(a.año||0):new Date(b.fecha_agregado||0)-new Date(a.fecha_agregado||0));
+  filtered.sort((a,b)=>{
+    if(sort==='titulo')return(a.titulo||'').localeCompare(b.titulo||'');
+    if(sort==='autor')return(a.autor||'').localeCompare(b.autor||'');
+    if(sort==='coleccion')return(a.coleccion||'zzz').localeCompare(b.coleccion||'zzz');
+    if(sort==='año')return(b.año||0)-(a.año||0);
+    return new Date(b.fecha_agregado||0)-new Date(a.fecha_agregado||0);
+  });
   const n=filtered.length;
   document.getElementById('book-count').textContent=`${n} libro${n!==1?'s':''}`;
   document.getElementById('empty-state').classList.toggle('show',library.length===0);
   renderGrid();renderList();renderShelves();
+}
+
+function bookCardBadges(b){
+  return`<span class="badge badge-${b.tipo}">${b.tipo==='fisico'?'📖 Físico':'💻 Ebook'}</span>`+
+    (b.coleccion?`<span class="badge badge-coleccion">📚 ${eh(b.coleccion)}</span>`:'')+
+    (b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:'')+
+    (b.estante&&b.tipo==='fisico'?`<span class="badge" style="background:var(--bg3);color:var(--text3)">Estante ${eh(String(b.estante))}</span>`:'')+
+    (b.formato_digital?`<span class="badge" style="background:rgba(160,126,224,.13);color:var(--purple)">${b.formato_digital.toUpperCase()}</span>`:'');
 }
 
 function renderGrid(){
@@ -504,12 +626,7 @@ function renderGrid(){
       <div class="bk-info">
         <div class="bk-title">${eh(b.titulo||'')}</div>
         <div class="bk-author">${eh(b.autor||'')}</div>
-        <div class="bk-badges">
-          <span class="badge badge-${b.tipo}">${b.tipo==='fisico'?'📖 Físico':'💻 Ebook'}</span>
-          ${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}
-          ${b.estante?`<span class="badge" style="background:var(--bg3);color:var(--text3)">${eh(b.estante)}</span>`:''}
-          ${b.formato_digital?`<span class="badge" style="background:rgba(160,126,224,.13);color:var(--purple)">${b.formato_digital.toUpperCase()}</span>`:''}
-        </div>
+        <div class="bk-badges">${bookCardBadges(b)}</div>
       </div>
     </div>`).join('');
 }
@@ -517,16 +634,33 @@ function renderList(){
   document.getElementById('books-list').innerHTML=filtered.map(b=>`
     <div class="bli" onclick="openDetail('${b.id}')">
       ${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph">📖</div>`}
-      <div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div>
-      <div class="bli-meta">${b.estante?`<span class="bli-estante">📌 ${eh(b.estante)}</span>`:''}<span class="badge badge-${b.tipo}">${b.tipo==='fisico'?'📖':'💻'}</span>${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div>
+      <div class="bli-main">
+        <div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:11px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div>
+        <div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div>
+      </div>
+      <div class="bli-meta">
+        ${b.estante&&b.tipo==='fisico'?`<span class="bli-estante">📌 ${b.estante}</span>`:''}
+        <span class="badge badge-${b.tipo}">${b.tipo==='fisico'?'📖':'💻'}</span>
+        ${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}
+      </div>
     </div>`).join('');
 }
 function renderShelves(){
-  const groups={};filtered.forEach(b=>{const k=b.estante||'📦 Sin estante';if(!groups[k])groups[k]=[];groups[k].push(b);});
-  document.getElementById('shelves-view').innerHTML=Object.entries(groups).map(([s,books])=>`
+  const groups={};
+  filtered.forEach(b=>{
+    const k=b.tipo==='fisico'?(b.estante?`Estante ${b.estante}`:'📦 Sin estante'):'💻 Ebooks';
+    if(!groups[k])groups[k]=[];groups[k].push(b);
+  });
+  // Sort shelf keys numerically
+  const keys=Object.keys(groups).sort((a,b)=>{
+    const na=parseInt(a.replace('Estante ','')),nb=parseInt(b.replace('Estante ',''));
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.localeCompare(b);
+  });
+  document.getElementById('shelves-view').innerHTML=keys.map(s=>`
     <div class="shelf-group">
-      <div class="shelf-name">📚 ${eh(s)} <span style="font-size:13px;color:var(--text3)">${books.length} libro${books.length!==1?'s':''}</span></div>
-      <div class="shelf-books">${books.map(b=>`
+      <div class="shelf-name">📚 ${eh(s)} <span style="font-size:13px;color:var(--text3)">${groups[s].length} libro${groups[s].length!==1?'s':''}</span></div>
+      <div class="shelf-books">${groups[s].map(b=>`
         <div class="book-card" style="width:110px" onclick="openDetail('${b.id}')">
           ${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}
           <div class="bc-ph" style="${b.portada_url?'display:none':''}">📖</div>
@@ -534,27 +668,27 @@ function renderShelves(){
         </div>`).join('')}</div>
     </div>`).join('');
 }
+
 function updateDropdowns(){
-  const ests=[...new Set(library.map(b=>b.estante).filter(Boolean))].sort();
+  const ests=[...new Set(library.filter(b=>b.tipo==='fisico'&&b.estante).map(b=>String(b.estante)))].sort((a,b)=>parseInt(a)-parseInt(b));
   const gens=[...new Set(library.map(b=>b.genero).filter(Boolean))].sort();
-  const esv=document.getElementById('f-estante').value,gnv=document.getElementById('f-genero').value;
-  document.getElementById('f-estante').innerHTML='<option value="">Todos</option>'+ests.map(e=>`<option value="${eh(e)}" ${esv===e?'selected':''}>${eh(e)}</option>`).join('');
+  const cols=[...new Set(library.map(b=>b.coleccion).filter(Boolean))].sort();
+  const esv=document.getElementById('f-estante').value,gnv=document.getElementById('f-genero').value,clv=document.getElementById('f-coleccion').value;
+  document.getElementById('f-estante').innerHTML='<option value="">Todos</option>'+ests.map(e=>`<option value="${e}" ${esv===e?'selected':''}>Estante ${e}</option>`).join('');
   document.getElementById('f-genero').innerHTML='<option value="">Todos</option>'+gens.map(g=>`<option value="${eh(g)}" ${gnv===g?'selected':''}>${eh(g)}</option>`).join('');
+  document.getElementById('f-coleccion').innerHTML='<option value="">Todas</option>'+cols.map(c=>`<option value="${eh(c)}" ${clv===c?'selected':''}>${eh(c)}</option>`).join('');
 }
 
+// ── VIEWS ──────────────────────────────────────────────────
 function setView(v){
-  ['grid','list','shelves'].forEach(x=>{
-    document.getElementById(x==='shelves'?'shelves-view':'books-'+x).style.display='none';
-    document.getElementById('nav-'+x).classList.remove('active');
-    document.getElementById('vb-'+x).classList.remove('active');
-  });
+  ['grid','list','shelves'].forEach(x=>{document.getElementById(x==='shelves'?'shelves-view':'books-'+x).style.display='none';document.getElementById('nav-'+x).classList.remove('active');document.getElementById('vb-'+x).classList.remove('active');});
   if(v==='grid')document.getElementById('books-grid').style.display='grid';
   else if(v==='list')document.getElementById('books-list').style.display='flex';
   else document.getElementById('shelves-view').style.display='block';
-  document.getElementById('nav-'+v).classList.add('active');
-  document.getElementById('vb-'+v).classList.add('active');
+  document.getElementById('nav-'+v).classList.add('active');document.getElementById('vb-'+v).classList.add('active');
 }
 
+// ── DETAIL PANEL ───────────────────────────────────────────
 function openDetail(id){
   selBookId=id;pendingChanges=false;
   document.getElementById('unsaved-bar').classList.remove('show');
@@ -565,14 +699,37 @@ function closeDetail(){
   if(pendingChanges&&!confirm('Tenés cambios sin guardar. ¿Cerrar igual?'))return;
   document.getElementById('detail-panel').classList.remove('open');selBookId=null;
 }
+
 function renderDetail(b){
   const toc=(b.indice||[]).map((r,i)=>`<tr><td><input value="${eh(r.numero||String(i+1))}" onchange="updToc(${i},'numero',this.value)" style="width:35px"></td><td><input value="${eh(r.titulo||'')}" onchange="updToc(${i},'titulo',this.value)"></td><td><input value="${eh(r.pagina||'')}" onchange="updToc(${i},'pagina',this.value)" style="width:45px"></td><td><button class="toc-del" onclick="delToc(${i})">🗑</button></td></tr>`).join('');
+
+  const estandeField=b.tipo==='fisico'?`
+    <div class="mi" style="grid-column:1/-1">
+      <div class="mk">Estante (1-30)</div>
+      <div class="mv"><input type="number" min="1" max="30" value="${b.estante||''}" placeholder="Ej: 5"
+        style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px"
+        onchange="updField('estante',parseInt(this.value)||'')" oninput="markUnsaved()">
+      </div>
+    </div>
+    <div class="mi" style="grid-column:1/-1">
+      <div class="mk">Colección</div>
+      <div class="mv"><input type="text" value="${eh(b.coleccion||'')}" placeholder="Ej: Harry Potter"
+        style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px"
+        onchange="updField('coleccion',this.value)" oninput="markUnsaved()">
+      </div>
+    </div>`:
+    `<div class="mi" style="grid-column:1/-1">
+      <div class="mk">Archivo en Drive</div>
+      <div class="mv" style="font-size:12px">${b.drive_url?`<a href="${b.drive_url}" target="_blank" style="color:var(--accent)">📁 Abrir en Drive</a>`:'Sin archivo subido'}</div>
+    </div>`;
+
   document.getElementById('dp-content').innerHTML=`
     <div id="dp-cover-wrap">${b.portada_url?`<img src="${b.portada_url}" onerror="this.style.display='none'">`:`<div id="dp-cover-ph">📖</div>`}<div class="dp-cover-grad"></div></div>
     <div class="dp-title">${eh(b.titulo||'')}</div>
     <div class="dp-author">${eh(b.autor||'')}</div>
     <div class="dp-badges">
       <span class="badge badge-${b.tipo}">${b.tipo==='fisico'?'📖 Físico':'💻 Ebook'}</span>
+      ${b.coleccion?`<span class="badge badge-coleccion">📚 ${eh(b.coleccion)}</span>`:''}
       ${b.formato_digital?`<span class="badge" style="background:rgba(160,126,224,.13);color:var(--purple)">${b.formato_digital.toUpperCase()}</span>`:''}
       <select style="background:var(--bg3);border:none;color:var(--text2);cursor:pointer;font-size:10px;padding:2px 6px;border-radius:9px;outline:none" onchange="updField('estado',this.value);saveCurrent()">
         <option value="pendiente" ${b.estado==='pendiente'?'selected':''}>Pendiente</option>
@@ -587,9 +744,7 @@ function renderDetail(b){
       <div class="mi"><div class="mk">Idioma</div><div class="mv">${eh(b.idioma||'—')}</div></div>
       ${b.isbn?`<div class="mi"><div class="mk">ISBN</div><div class="mv">${eh(b.isbn)}</div></div>`:''}
       ${b.genero?`<div class="mi"><div class="mk">Género</div><div class="mv">${eh(b.genero)}</div></div>`:''}
-      <div class="mi" style="grid-column:1/-1"><div class="mk">Estante / Ubicación</div>
-        <div class="mv"><input type="text" value="${eh(b.estante||'')}" placeholder="Ej: A-2" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('estante',this.value)" oninput="markUnsaved()"></div>
-      </div>
+      ${estandeField}
     </div>
     <div class="ds"><div class="dst">📝 Descripción / Temática <span style="font-size:10px;color:var(--text3)">Editable</span></div>
       <textarea class="ef" rows="4" oninput="updField('descripcion',this.value);markUnsaved()">${eh(b.descripcion||'')}</textarea>
@@ -598,7 +753,17 @@ function renderDetail(b){
       <textarea class="ef" rows="3" oninput="updField('mis_comentarios',this.value);markUnsaved()">${eh(b.mis_comentarios||'')}</textarea>
     </div>
     ${b.bio_autor?`<div class="ds"><div class="dst">👤 Biografía del autor</div><div class="fro">${eh(b.bio_autor)}</div></div>`:''}
-    ${b.epub_url?`<div class="ds"><div class="dst">📥 Versión digital</div><div class="epub-card"><div class="epub-src">Archivo disponible</div><div class="epub-ttl">${eh(b.titulo||'')}</div><div class="epub-acts"><a href="${b.epub_url}" target="_blank" class="btn btn-accent btn-sm">⬇ Descargar</a><button class="btn btn-ghost btn-sm" onclick="updField('epub_url','');markUnsaved()">✕ Quitar</button></div></div></div>`:`<div class="ds"><div class="dst">📥 EPUB / Archivo digital</div><div style="display:flex;gap:6px"><input type="text" id="epub-url-inp" placeholder="URL o ruta..."><button class="btn btn-ghost btn-sm" onclick="setEpub()">OK</button></div></div>`}
+    ${b.epub_url||b.drive_url?`
+    <div class="ds"><div class="dst">📥 Versión digital</div><div class="epub-card">
+      <div class="epub-src">${b.drive_url?'📁 Guardado en tu Drive':'🌐 Descarga gratuita'}</div>
+      <div class="epub-ttl">${eh(b.titulo||'')}</div>
+      <div class="epub-acts">
+        ${b.drive_url?`<a href="${b.drive_url}" target="_blank" class="btn btn-accent btn-sm">📁 Abrir en Drive</a>`:''}
+        ${b.epub_url?`<a href="${b.epub_url}" target="_blank" class="btn btn-ghost btn-sm">⬇ Descargar</a>`:''}
+      </div>
+    </div></div>`:
+    `<div class="ds"><div class="dst">📥 EPUB / Archivo digital</div>
+    <div style="display:flex;gap:6px"><input type="text" id="epub-url-inp" placeholder="URL o ruta..."><button class="btn btn-ghost btn-sm" onclick="setEpub()">OK</button></div></div>`}
     <div class="ds"><div class="dst">📑 Índice <button onclick="addToc()">+ Capítulo</button></div>
       <div style="overflow-x:auto"><table class="toc-tbl"><thead><tr><th>#</th><th>Título</th><th>Pág</th><th></th></tr></thead><tbody id="toc-body">${toc}</tbody></table></div>
     </div>
@@ -613,6 +778,7 @@ function delToc(i){const b=library.find(x=>x.id===selBookId);if(!b)return;b.indi
 function setEpub(){const u=document.getElementById('epub-url-inp')?.value.trim();if(u){updField('epub_url',u);saveCurrent();}}
 async function saveCurrent(){const b=library.find(x=>x.id===selBookId);if(!b)return;await saveToDrive();renderLib();renderDetail(b);}
 
+// ── DELETE ─────────────────────────────────────────────────
 function deleteBook(id){
   const b=library.find(x=>x.id===id);
   document.getElementById('confirm-txt').textContent=`¿Eliminar "${b?.titulo}"? Esta acción no se puede deshacer.`;
@@ -622,7 +788,9 @@ function deleteBook(id){
 function closeConfirm(){document.getElementById('confirm').classList.remove('open');confirmCb=null;}
 function doConfirm(){if(confirmCb)confirmCb();closeConfirm();}
 
-function openAdd(){selBookData=null;dzPending=[];
+// ── ADD MODAL ──────────────────────────────────────────────
+function openAdd(){
+  selBookData=null;dzPending=[];
   document.getElementById('add-modal').classList.add('open');
   document.getElementById('sel-preview').style.display='none';
   document.getElementById('modal-q').value='';
@@ -638,7 +806,16 @@ function switchTab(t){
   if(t!=='camera')stopCam();
   if(t==='manual'||t==='digital')document.getElementById('sel-preview').style.display='none';
 }
+function toggleManualFields(){
+  const t=document.getElementById('m-tipo').value;
+  document.getElementById('m-fisico-fields').style.display=t==='fisico'?'block':'none';
+}
+function togglePreviewFields(){
+  const t=document.getElementById('prev-tipo').value;
+  document.getElementById('prev-fisico-fields').style.display=t==='fisico'?'block':'none';
+}
 
+// ── BOOK SEARCH ────────────────────────────────────────────
 function debBookSearch(){clearTimeout(bookDT);bookDT=setTimeout(searchBooks,500);}
 async function searchBooks(){
   const q=document.getElementById('modal-q').value.trim();
@@ -652,41 +829,26 @@ async function searchBooks(){
     document.getElementById('s-results-wrap').style.display='block';
   }catch(e){document.getElementById('s-loading').style.display='none';toast('Error buscando','err');}
 }
-
 function srHTML(b,i,ctx){return`<div class="sri" onclick="selectBook(${i},'${ctx}')" id="${ctx}r-${i}">${b.cover?`<img class="sri-cov" src="${b.cover}" onerror="this.style.display='none'">`:`<div class="sri-ph">📖</div>`}<div><div class="sri-t">${eh(b.titulo)}</div><div class="sri-a">${eh(b.autor)}${b.año?' · '+b.año:''}</div><div style="font-size:10px;color:var(--text3)">${b.source}</div></div></div>`;}
 
 async function fetchBooks(q){
   const res=[],seen=new Set();
-  // Open Library — preferir español
-  try{
-    const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&lang=spa&limit=6&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);
-    const d=await r.json();
-    (d.docs||[]).forEach(b=>{const k=(b.title||'')+(b.author_name?.[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'es',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});}});
-  }catch(e){}
-  // Google Books — español latinoamérica
-  try{
-    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);
-    const d=await r.json();
-    (d.items||[]).forEach(item=>{const info=item.volumeInfo||{};const k=(info.title||'')+((info.authors||[])[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?info.publishedDate.substring(0,4):'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'es',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});}});
-  }catch(e){}
+  try{const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&lang=spa&limit=6&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);const d=await r.json();(d.docs||[]).forEach(b=>{const k=(b.title||'')+(b.author_name?.[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'es',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});};});}catch(e){}
+  try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};const k=(info.title||'')+((info.authors||[])[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?info.publishedDate.substring(0,4):'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'es',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});};});}catch(e){}
   return res;
 }
 
 async function selectBook(i,ctx){
-  const results=ctx==='s'?_sRes:_cRes;
-  const bk=results[i];if(!bk)return;
+  const results=ctx==='s'?_sRes:_cRes;const bk=results[i];if(!bk)return;
   selBookData={...bk};
   document.querySelectorAll(`#${ctx==='s'?'s-results':'cam-results'} .sri`).forEach((el,j)=>el.classList.toggle('sel',j===i));
   document.getElementById('sel-preview').style.display='block';
-  document.getElementById('prev-cov').src=bk.cover||'';
-  document.getElementById('prev-cov').style.display=bk.cover?'block':'none';
-  document.getElementById('prev-title').textContent=bk.titulo;
-  document.getElementById('prev-author').textContent=bk.autor;
+  document.getElementById('prev-cov').src=bk.cover||'';document.getElementById('prev-cov').style.display=bk.cover?'block':'none';
+  document.getElementById('prev-title').textContent=bk.titulo;document.getElementById('prev-author').textContent=bk.autor;
   document.getElementById('prev-meta').textContent=[bk.año,bk.editorial,bk.isbn].filter(Boolean).join(' · ');
   document.getElementById('epub-result').innerHTML='<p style="color:var(--text3);font-size:11px">🔍 Buscando versión digital gratuita...</p>';
   if(bk.olKey){
-    try{
-      const wr=await fetch(`https://openlibrary.org${bk.olKey}.json`);const wd=await wr.json();
+    try{const wr=await fetch(`https://openlibrary.org${bk.olKey}.json`);const wd=await wr.json();
       if(wd.description)selBookData.descripcion=typeof wd.description==='string'?wd.description:wd.description.value||'';
       if(wd.subjects?.length)selBookData.genero=wd.subjects[0];
       if(wd.authors?.length){try{const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);const ad=await ar.json();if(ad.bio)selBookData.bio_autor=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';}catch(e){}}
@@ -707,26 +869,39 @@ async function searchEpub(titulo,autor){
 
 async function addSelected(){
   if(!selBookData)return;
-  const nb={id:crypto.randomUUID(),tipo:document.getElementById('prev-tipo').value,titulo:selBookData.titulo||'',autor:selBookData.autor||'',isbn:selBookData.isbn||'',año:selBookData.año||'',editorial:selBookData.editorial||'',idioma:selBookData.idioma||'',genero:selBookData.genero||'',paginas:selBookData.paginas||'',portada_url:selBookData.cover||'',descripcion:selBookData.descripcion||'',bio_autor:selBookData.bio_autor||'',indice:selBookData.indice||[],epub_url:selBookData.epub_url||'',estante:document.getElementById('prev-estante').value.trim(),fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
-  library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
+  const tipo=document.getElementById('prev-tipo').value;
+  const nb={
+    id:crypto.randomUUID(),tipo,
+    titulo:selBookData.titulo||'',autor:selBookData.autor||'',isbn:selBookData.isbn||'',
+    año:selBookData.año||'',editorial:selBookData.editorial||'',idioma:selBookData.idioma||'',
+    genero:selBookData.genero||'',paginas:selBookData.paginas||'',
+    portada_url:selBookData.cover||'',descripcion:selBookData.descripcion||'',
+    bio_autor:selBookData.bio_autor||'',indice:selBookData.indice||[],
+    epub_url:selBookData.epub_url||'',drive_url:'',
+    estante:tipo==='fisico'?(parseInt(document.getElementById('prev-estante').value)||''):'',
+    coleccion:tipo==='fisico'?document.getElementById('prev-coleccion').value.trim():'',
+    fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'
+  };
+  library.unshift(nb);await saveToDrive();renderLib();closeAdd();
+  toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
 }
 
+// ── MANUAL ─────────────────────────────────────────────────
 async function addManual(){
   const t=document.getElementById('m-titulo').value.trim();if(!t){toast('El título es obligatorio','err');return;}
-  const nb={id:crypto.randomUUID(),tipo:document.getElementById('m-tipo').value,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:document.getElementById('m-isbn').value.trim(),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',estante:document.getElementById('m-estante').value.trim(),fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
+  const tipo=document.getElementById('m-tipo').value;
+  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:document.getElementById('m-isbn').value.trim(),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',drive_url:'',estante:tipo==='fisico'?(parseInt(document.getElementById('m-estante').value)||''):'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
   library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
 }
 
-async function startCam(){
-  try{mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('cam-video');v.srcObject=mediaStream;v.style.display='block';document.getElementById('btn-start-cam').style.display='none';document.getElementById('btn-cap').style.display='inline-flex';}
-  catch(e){toast('No se pudo acceder a la cámara','err');}
-}
+// ── CAMERA ─────────────────────────────────────────────────
+async function startCam(){try{mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('cam-video');v.srcObject=mediaStream;v.style.display='block';document.getElementById('btn-start-cam').style.display='none';document.getElementById('btn-cap').style.display='inline-flex';}catch(e){toast('No se pudo acceder a la cámara','err');}}
 function captureCam(){const v=document.getElementById('cam-video'),c=document.getElementById('cam-canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);const p=document.getElementById('cam-photo');p.src=c.toDataURL('image/jpeg');p.style.display='block';stopCam();v.style.display='none';document.getElementById('cam-isbn-row').style.display='block';document.getElementById('cam-q').focus();}
 function loadPhotoFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const p=document.getElementById('cam-photo');p.src=ev.target.result;p.style.display='block';document.getElementById('cam-isbn-row').style.display='block';document.getElementById('cam-q').focus();};r.readAsDataURL(f);}
 async function searchFromCam(){const q=document.getElementById('cam-q').value.trim();if(!q){toast('Ingresá un título o ISBN','err');return;}toast('Buscando...','info');_cRes=await fetchBooks(q);if(!_cRes.length){toast('Sin resultados','err');return;}document.getElementById('cam-results').innerHTML=_cRes.map((b,i)=>srHTML(b,i,'c')).join('');document.getElementById('cam-results-wrap').style.display='block';}
 function stopCam(){if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}const v=document.getElementById('cam-video');if(v){v.style.display='none';v.srcObject=null;}const bc=document.getElementById('btn-cap'),bs=document.getElementById('btn-start-cam');if(bc)bc.style.display='none';if(bs)bs.style.display='inline-flex';}
 
-// DRAG & DROP
+// ── DRAG & DROP + DRIVE UPLOAD ─────────────────────────────
 function dzOver(e){e.preventDefault();document.getElementById('drop-zone').classList.add('drag-over');}
 function dzLeave(){document.getElementById('drop-zone').classList.remove('drag-over');}
 function dzDrop(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('drag-over');processFiles([...e.dataTransfer.files]);}
@@ -743,110 +918,120 @@ async function processFiles(files){
     document.getElementById('drop-list').insertAdjacentHTML('beforeend',`
       <div class="dz-item" id="${uid}">
         <span class="dz-icon2">${icon}</span>
-        <div class="dz-iinfo"><div class="dz-iname">${eh(f.name)}</div><div class="dz-imeta">${(f.size/1024/1024).toFixed(1)} MB · ${ext.toUpperCase()}</div></div>
+        <div class="dz-iinfo">
+          <div class="dz-iname">${eh(f.name)}</div>
+          <div class="dz-imeta">${(f.size/1024/1024).toFixed(1)} MB · ${ext.toUpperCase()}</div>
+          <div class="progress-bar" id="${uid}-pb" style="display:none"><div class="progress-fill" id="${uid}-pf" style="width:0%"></div></div>
+        </div>
         <span class="dz-load" id="${uid}-st">⟳ Procesando...</span>
       </div>`);
-    const bk=await extractMeta(f,ext,uid);
+    const bk=await extractAndUpload(f,ext,uid);
     dzPending.push(bk);
   }
   document.getElementById('dz-add-btn').style.display='block';
 }
 
-async function extractMeta(file,ext,uid){
+async function extractAndUpload(file,ext,uid){
   const st=document.getElementById(uid+'-st');
-  let bk={id:crypto.randomUUID(),tipo:'ebook',formato_digital:ext,titulo:file.name.replace(/\.[^/.]+$/,''),autor:'',isbn:'',año:'',editorial:'',idioma:'Español',genero:'',paginas:'',portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',estante:'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente',archivo_local:file.name};
+  const pb=document.getElementById(uid+'-pb');
+  const pf=document.getElementById(uid+'-pf');
+  let bk={id:crypto.randomUUID(),tipo:'ebook',formato_digital:ext,titulo:file.name.replace(/\.[^/.]+$/,''),autor:'',isbn:'',año:'',editorial:'',idioma:'Español',genero:'',paginas:'',portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',drive_url:'',estante:'',coleccion:'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente',archivo_local:file.name};
+  
+  // 1. Extract metadata from EPUB
   try{
     if(ext==='epub'){
-      const ab=await file.arrayBuffer();
-      const meta=await parseEpubMeta(new Uint8Array(ab));
-      if(meta){
-        if(meta.title)bk.titulo=meta.title;if(meta.author)bk.autor=meta.author;
-        if(meta.year)bk.año=meta.year;if(meta.publisher)bk.editorial=meta.publisher;
-        if(meta.lang)bk.idioma=meta.lang;if(meta.description)bk.descripcion=meta.description;
-        if(meta.coverData)bk.portada_url=meta.coverData;
-      }
+      const ab=await file.arrayBuffer();const meta=await parseEpubMeta(new Uint8Array(ab));
+      if(meta){if(meta.title)bk.titulo=meta.title;if(meta.author)bk.autor=meta.author;if(meta.year)bk.año=meta.year;if(meta.publisher)bk.editorial=meta.publisher;if(meta.lang)bk.idioma=meta.lang;if(meta.description)bk.descripcion=meta.description;if(meta.coverData)bk.portada_url=meta.coverData;}
     }else{
       bk.titulo=file.name.replace(/\.[^/.]+$/,'').replace(/[-_]/g,' ').replace(/\s+/g,' ').trim();
     }
-    // Enrich online
-    if(bk.titulo){
-      try{
-        const online=await fetchBooks(bk.titulo+(bk.autor?' '+bk.autor:''));
-        if(online.length){const m=online[0];
-          if(!bk.portada_url&&m.cover)bk.portada_url=m.cover;
-          if(!bk.descripcion&&m.descripcion)bk.descripcion=m.descripcion;
-          if(!bk.genero&&m.genero)bk.genero=m.genero;
-          if(!bk.año&&m.año)bk.año=m.año;
-          if(!bk.editorial&&m.editorial)bk.editorial=m.editorial;
-          if(!bk.autor&&m.autor)bk.autor=m.autor;
-          if(!bk.isbn&&m.isbn)bk.isbn=m.isbn;
+  }catch(e){}
+
+  // 2. Enrich online (description, author bio, cover)
+  if(bk.titulo){
+    try{
+      if(st)st.textContent='🔍 Buscando metadatos...';
+      const online=await fetchBooks(bk.titulo+(bk.autor?' '+bk.autor:''));
+      if(online.length){const m=online[0];
+        if(!bk.portada_url&&m.cover)bk.portada_url=m.cover;
+        if(!bk.descripcion&&m.descripcion)bk.descripcion=m.descripcion;
+        if(!bk.genero&&m.genero)bk.genero=m.genero;
+        if(!bk.año&&m.año)bk.año=m.año;
+        if(!bk.editorial&&m.editorial)bk.editorial=m.editorial;
+        if(!bk.autor&&m.autor)bk.autor=m.autor;
+        if(!bk.isbn&&m.isbn)bk.isbn=m.isbn;
+        // Get bio from Open Library
+        if(m.olKey&&!bk.bio_autor){
+          try{const wr=await fetch(`https://openlibrary.org${m.olKey}.json`);const wd=await wr.json();
+            if(wd.authors?.length){const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);const ad=await ar.json();if(ad.bio)bk.bio_autor=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';}
+          }catch(e){}
         }
-      }catch(e){}
-    }
+      }
+    }catch(e){}
+  }
+
+  // 3. Upload to Drive
+  if(accessToken&&epubFolderId){
+    try{
+      if(st)st.textContent='☁ Subiendo a Drive...';
+      if(pb)pb.style.display='block';
+      const result=await uploadFileToDrive(file,bk.autor,(pct)=>{if(pf)pf.style.width=pct+'%';});
+      if(result){
+        bk.drive_url=result.url;
+        if(st){st.textContent='✓ En Drive';st.className='dz-ok';}
+      }else{
+        if(st){st.textContent='⚠ Sin Drive';st.className='dz-load';}
+      }
+    }catch(e){if(st){st.textContent='⚠ Error Drive';st.className='dz-err';}}
+  }else{
     if(st){st.textContent='✓ Listo';st.className='dz-ok';}
-  }catch(e){if(st){st.textContent='⚠ Sin metadatos';st.className='dz-load';}}
+  }
   return bk;
 }
 
+async function addAllDigital(){
+  if(!dzPending.length)return;
+  library.unshift(...dzPending);await saveToDrive();renderLib();closeAdd();
+  toast(`${dzPending.length} libro${dzPending.length!==1?'s':''} agregado${dzPending.length!==1?'s':''}✓`,'ok');
+  dzPending=[];
+}
+
+// ── EPUB PARSER ────────────────────────────────────────────
 async function parseEpubMeta(arr){
   try{
-    const files=unzip(arr);
-    const container=files['META-INF/container.xml'];if(!container)return null;
-    const cxml=new TextDecoder().decode(container);
-    const opfM=cxml.match(/full-path="([^"]+\.opf)"/i);if(!opfM)return null;
+    const files=unzip(arr);const container=files['META-INF/container.xml'];if(!container)return null;
+    const cxml=new TextDecoder().decode(container);const opfM=cxml.match(/full-path="([^"]+\.opf)"/i);if(!opfM)return null;
     const opfPath=opfM[1];const opfData=files[opfPath];if(!opfData)return null;
     const opfXml=new TextDecoder().decode(opfData);
     const doc=new DOMParser().parseFromString(opfXml,'text/xml');
     const dc='http://purl.org/dc/elements/1.1/';
     const get=tag=>{const el=doc.getElementsByTagNameNS(dc,tag)[0]||doc.querySelector(tag);return el?el.textContent.trim():'';};
-    const meta={title:get('title'),author:get('creator'),publisher:get('publisher'),year:'',isbn:'',lang:get('language'),description:get('description')};
-    const dateEl=doc.getElementsByTagNameNS(dc,'date')[0]||doc.querySelector('date');
-    if(dateEl)meta.year=dateEl.textContent.substring(0,4);
-    // Cover
-    const items=doc.querySelectorAll('manifest item');
-    let coverItem=null;
+    const meta={title:get('title'),author:get('creator'),publisher:get('publisher'),year:'',lang:get('language'),description:get('description')};
+    const dateEl=doc.getElementsByTagNameNS(dc,'date')[0]||doc.querySelector('date');if(dateEl)meta.year=dateEl.textContent.substring(0,4);
+    const items=doc.querySelectorAll('manifest item');let coverItem=null;
     items.forEach(item=>{const id=(item.getAttribute('id')||'').toLowerCase();const mt=item.getAttribute('media-type')||'';const href=(item.getAttribute('href')||'').toLowerCase();if((id.includes('cover')||href.includes('cover'))&&mt.startsWith('image/'))coverItem=item;});
-    if(coverItem){
-      const href=coverItem.getAttribute('href');
-      const opfDir=opfPath.includes('/')?opfPath.substring(0,opfPath.lastIndexOf('/')+1):'';
-      const imgData=files[opfDir+href]||files[href];
-      if(imgData){const mt=coverItem.getAttribute('media-type')||'image/jpeg';meta.coverData=`data:${mt};base64,${btoa(String.fromCharCode(...imgData))}`;}
-    }
+    if(coverItem){const href=coverItem.getAttribute('href');const opfDir=opfPath.includes('/')?opfPath.substring(0,opfPath.lastIndexOf('/')+1):'';const imgData=files[opfDir+href]||files[href];if(imgData){const mt=coverItem.getAttribute('media-type')||'image/jpeg';meta.coverData=`data:${mt};base64,${btoa(String.fromCharCode(...imgData))}`;}}
     return meta;
   }catch(e){return null;}
 }
-
 function unzip(arr){
   const files={};let i=0;
   while(i<arr.length-4){
     if(arr[i]===0x50&&arr[i+1]===0x4B&&arr[i+2]===0x03&&arr[i+3]===0x04){
-      const comp=arr[i+8]|(arr[i+9]<<8);
-      const cSize=arr[i+18]|(arr[i+19]<<8)|(arr[i+20]<<16)|(arr[i+21]<<24);
-      const uSize=arr[i+22]|(arr[i+23]<<8)|(arr[i+24]<<16)|(arr[i+25]<<24);
-      const fnLen=arr[i+26]|(arr[i+27]<<8);
-      const exLen=arr[i+28]|(arr[i+29]<<8);
-      const name=new TextDecoder().decode(arr.slice(i+30,i+30+fnLen));
-      const start=i+30+fnLen+exLen;
-      if(comp===0)files[name]=arr.slice(start,start+uSize);
-      else files[name]=arr.slice(start,start+cSize);
+      const comp=arr[i+8]|(arr[i+9]<<8);const cSize=arr[i+18]|(arr[i+19]<<8)|(arr[i+20]<<16)|(arr[i+21]<<24);const uSize=arr[i+22]|(arr[i+23]<<8)|(arr[i+24]<<16)|(arr[i+25]<<24);const fnLen=arr[i+26]|(arr[i+27]<<8);const exLen=arr[i+28]|(arr[i+29]<<8);
+      const name=new TextDecoder().decode(arr.slice(i+30,i+30+fnLen));const start=i+30+fnLen+exLen;
+      if(comp===0)files[name]=arr.slice(start,start+uSize);else files[name]=arr.slice(start,start+cSize);
       i=start+(comp===0?uSize:cSize);
     }else{i++;}
   }
   return files;
 }
 
-async function addAllDigital(){
-  if(!dzPending.length)return;
-  library.unshift(...dzPending);
-  await saveToDrive();renderLib();closeAdd();
-  toast(`${dzPending.length} libro${dzPending.length!==1?'s':''} agregado${dzPending.length!==1?'s':''}✓`,'ok');
-  dzPending=[];
-}
-
+// ── MISC ───────────────────────────────────────────────────
 function debSearch(){clearTimeout(searchDT);searchDT=setTimeout(applyFilters,300);}
-function clearFilters(){['f-tipo','f-estado','f-estante','f-genero','f-formato','f-sort'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-sort'?'fecha':'';});document.getElementById('search-input').value='';applyFilters();}
+function clearFilters(){['f-tipo','f-estado','f-estante','f-genero','f-formato','f-sort','f-coleccion'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-sort'?'fecha':'';});document.getElementById('search-input').value='';applyFilters();}
 function exportJSON(){const b=new Blob([JSON.stringify(library,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='biblioteca.json';a.click();}
-function importJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{library=JSON.parse(ev.target.result);await saveToDrive();renderLib();toast(`${library.length} libros importados`,'ok');}catch(err){toast('Error al importar','err');}}; r.readAsText(f);}
+function importJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{library=JSON.parse(ev.target.result);await saveToDrive();renderLib();toast(`${library.length} libros importados`,'ok');}catch(err){toast('Error al importar','err');}};r.readAsText(f);}
 function toast(msg,type='info'){const el=document.createElement('div');const icons={ok:'✓',err:'✕',info:'ℹ'};el.className=`toast t-${type}`;el.innerHTML=`${icons[type]||'ℹ'} ${eh(msg)}`;document.getElementById('toasts').appendChild(el);setTimeout(()=>el.remove(),3500);}
 function eh(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script>
