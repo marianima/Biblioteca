@@ -692,7 +692,8 @@ async function importFromDrive(){
 async function buildBookFromDriveFile(f,uid){
   const st=document.getElementById(uid+'-st');
   const ext=f.name.split('.').pop().toLowerCase();
-  let bk={id:crypto.randomUUID(),tipo:'ebook',formato_digital:ext,titulo:f.name.replace(/\.[^/.]+$/,'').replace(/[-_]/g,' ').trim(),autor:f.author||'',isbn:'',año:'',editorial:'',idioma:'Español',genero:'',paginas:'',portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',drive_url:f.folderUrl||'',drive_file_id:f.id,estante:'',coleccion:'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
+  const cleaned = cleanFilename(f.name, f.author);
+  let bk={id:crypto.randomUUID(),tipo:'ebook',formato_digital:ext,titulo:cleaned.titulo,autor:cleaned.autor||f.author||'',isbn:'',año:'',editorial:'',idioma:'Español',genero:'',paginas:'',portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',drive_url:f.folderUrl||'',drive_file_id:f.id,estante:'',coleccion:'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
   try{
     if(st)st.textContent='🔍';
     const online=await fetchBooks(bk.titulo+(bk.autor?' '+bk.autor:''));
@@ -858,6 +859,7 @@ function renderDetail(b){
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-danger btn-sm" onclick="deleteBook('${b.id}')">🗑 Eliminar</button>
       ${b.tipo!=='ambos'?`<button class="btn btn-ghost btn-sm" onclick="promptAddOtherFormat('${b.id}')">➕ Agregar ${b.tipo==='fisico'?'versión digital':'versión física'}</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="rebuscarMetadatos('${b.id}')">🔄 Rebuscar metadatos</button>
     </div>`;
 }
 
@@ -881,6 +883,54 @@ function addToc(){const b=library.find(x=>x.id===selBookId);if(!b)return;if(!b.i
 function delToc(i){const b=library.find(x=>x.id===selBookId);if(!b)return;b.indice.splice(i,1);markUnsaved();renderDetail(b);}
 function setEpub(){const u=document.getElementById('epub-url-inp')?.value.trim();if(u){updField('epub_url',u);saveCurrent();}}
 async function saveCurrent(){const b=library.find(x=>x.id===selBookId);if(!b)return;await saveToDrive();renderLib();renderDetail(b);}
+
+async function rebuscarMetadatos(id) {
+  const b = library.find(x => x.id === id);
+  if (!b) return;
+  // Ask user to confirm/correct title and author before searching
+  const titulo = prompt('Título a buscar:', b.titulo || '');
+  if (!titulo) return;
+  const autor = prompt('Autor (opcional, ayuda a afinar):', b.autor || '');
+  toast('Buscando metadatos...', 'info');
+  try {
+    const q = titulo + (autor ? ' ' + autor : '');
+    const results = await fetchBooks(q);
+    if (!results.length) { toast('No se encontraron resultados', 'err'); return; }
+    const m = results[0];
+    // Update fields only if found value is better than current
+    if (m.cover) b.portada_url = m.cover;
+    if (m.titulo && m.titulo.length > 2) b.titulo = m.titulo;
+    if (m.autor && m.autor.length > 2 && !b.autor) b.autor = m.autor;
+    if (m.año) b.año = m.año;
+    if (m.editorial) b.editorial = m.editorial;
+    if (m.isbn) b.isbn = m.isbn;
+    if (m.paginas) b.paginas = m.paginas;
+    if (m.genero) b.genero = m.genero;
+    if (m.idioma) b.idioma = m.idioma;
+    // Enrich from Open Library
+    if (m.olKey) {
+      try {
+        const wr = await fetch(`https://openlibrary.org${m.olKey}.json`);
+        const wd = await wr.json();
+        if (wd.description) b.descripcion = typeof wd.description === 'string' ? wd.description : wd.description.value || b.descripcion;
+        if (wd.subjects?.length && !b.genero) b.genero = wd.subjects[0];
+        if (wd.authors?.length) {
+          try {
+            const ar = await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);
+            const ad = await ar.json();
+            if (ad.bio) b.bio_autor = typeof ad.bio === 'string' ? ad.bio : ad.bio.value || '';
+          } catch(e) {}
+        }
+      } catch(e) {}
+    }
+    await saveToDrive();
+    renderLib();
+    renderDetail(b);
+    toast('Metadatos actualizados ✓', 'ok');
+  } catch(e) {
+    toast('Error buscando metadatos', 'err');
+  }
+}
 
 function promptAddOtherFormat(id){const b=library.find(x=>x.id===id);if(!b)return;if(b.tipo==='fisico'){openAdd();switchTab('digital');toast(`Subí el archivo para unificarlo con "${b.titulo}"`, 'info');window._pendingMergeId=id;}else{const shelf=prompt('Estante para la versión física (ej: B3):');if(shelf){b.tipo='ambos';b.estante=shelf.toUpperCase();saveCurrent();toast('Versión física agregada ✓','ok');}}}
 function deleteBook(id){const b=library.find(x=>x.id===id);document.getElementById('confirm-txt').textContent=`¿Eliminar "${b?.titulo}"?`;confirmCb=async()=>{library=library.filter(x=>x.id!==id);await saveToDrive();renderLib();closeDetail();toast('Libro eliminado','info');};document.getElementById('confirm').classList.add('open');}
@@ -1010,8 +1060,21 @@ async function processFiles(files,autorOverride,containerId){
 async function extractAndUpload(file,ext,uid,autorOverride){
   const st=document.getElementById(uid+'-st'),pb=document.getElementById(uid+'-pb'),pf=document.getElementById(uid+'-pf');
   let bk={id:crypto.randomUUID(),tipo:'ebook',formato_digital:ext,titulo:file.name.replace(/\.[^/.]+$/,''),autor:autorOverride||'',isbn:'',año:'',editorial:'',idioma:'Español',genero:'',paginas:'',portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:'',coleccion:'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
-  if(ext==='epub'){try{const ab=await file.arrayBuffer();const meta=await parseEpubMeta(new Uint8Array(ab));if(meta){if(meta.title)bk.titulo=meta.title;if(meta.author)bk.autor=meta.author;if(meta.year)bk.año=meta.year;if(meta.publisher)bk.editorial=meta.publisher;if(meta.lang)bk.idioma=meta.lang;if(meta.description)bk.descripcion=meta.description;if(meta.coverData)bk.portada_url=meta.coverData;}}catch(e){}}
-  else{bk.titulo=file.name.replace(/\.[^/.]+$/,'').replace(/[-_]/g,' ').replace(/\s+/g,' ').trim();}
+  // Clean filename to extract title and author
+  const cleaned = cleanFilename(file.name, autorOverride);
+  bk.titulo = cleaned.titulo;
+  bk.autor = cleaned.autor || autorOverride || '';
+
+  if(ext==='epub'){try{const ab=await file.arrayBuffer();const meta=await parseEpubMeta(new Uint8Array(ab));if(meta){
+    // EPUB metadata takes priority over filename parsing, but only if it looks valid
+    if(meta.title && meta.title.length > 2) bk.titulo = meta.title;
+    if(meta.author && meta.author.length > 2) bk.autor = meta.author;
+    if(meta.year) bk.año=meta.year;
+    if(meta.publisher) bk.editorial=meta.publisher;
+    if(meta.lang) bk.idioma=meta.lang;
+    if(meta.description) bk.descripcion=meta.description;
+    if(meta.coverData) bk.portada_url=meta.coverData;
+  }}catch(e){}}
   // Always enrich online regardless of format
   if(bk.titulo){
     try{
@@ -1057,6 +1120,48 @@ async function addAllDigital(){
   await saveToDrive();renderLib();closeAdd();
   const msg=[];if(added)msg.push(`${added} agregado${added!==1?'s':''}`);if(merged)msg.push(`${merged} unificado${merged!==1?'s':''}`);
   toast(msg.join(', ')+'✓','ok');dzPending=[];
+}
+
+// ── FILENAME CLEANER ──────────────────────────────────────
+function cleanFilename(filename, autorOverride) {
+  // Remove extension
+  let name = filename.replace(/\.[^/.]+$/, '');
+  // Common separators between title and author in filenames: ' -- ', ' - ', ' by '
+  const separators = [' -- ', ' --- ', ' _ ', ' by '];
+  for (const sep of separators) {
+    if (name.includes(sep)) {
+      const parts = name.split(sep);
+      const titulo = toTitleCase(parts[0].trim());
+      const autor = parts.slice(1).join(sep).trim();
+      return { titulo, autor: autorOverride || autor };
+    }
+  }
+  // Try to detect if filename ends with an author name (2-3 capitalized words after the title)
+  // Pattern: "Title words Author Name" where last 2-3 words look like a proper name
+  const words = name.split(' ');
+  if (words.length >= 3) {
+    // Check last 2 words: if both are capitalized and no lowercase start → likely an author
+    const last2 = words.slice(-2);
+    const last3 = words.slice(-3);
+    const isProperName2 = last2.every(w => w.length > 1 && w[0] === w[0].toUpperCase() && /^[A-ZÁÉÍÓÚÑ]/.test(w));
+    const isProperName3 = last3.every(w => w.length > 1 && w[0] === w[0].toUpperCase() && /^[A-ZÁÉÍÓÚÑ]/.test(w));
+    if (isProperName3 && words.length >= 5) {
+      return { titulo: toTitleCase(words.slice(0, -3).join(' ')), autor: autorOverride || last3.join(' ') };
+    }
+    if (isProperName2 && words.length >= 4) {
+      return { titulo: toTitleCase(words.slice(0, -2).join(' ')), autor: autorOverride || last2.join(' ') };
+    }
+  }
+  // No pattern found: use full name as title, keep author from folder
+  return { titulo: toTitleCase(name.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim()), autor: autorOverride || '' };
+}
+
+function toTitleCase(str) {
+  // Convert ALL CAPS to Title Case, leave mixed case as-is
+  if (str === str.toUpperCase() && str.length > 3) {
+    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return str;
 }
 
 async function parseEpubMeta(arr){
