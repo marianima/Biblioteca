@@ -140,6 +140,8 @@ select option{background:var(--card)}
 .sp-btn{padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;transition:all .14s;font-weight:500}
 .sp-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 .sp-btn.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sp-btn.sp-btn-double{background:rgba(181,116,58,.08);border-color:var(--accent);color:var(--accent);font-size:11px}
+.sp-btn.sp-btn-double.selected{background:var(--accent);color:#fff}
 #empty-state{display:none;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;text-align:center;gap:12px}
 #empty-state.show{display:flex}
 .ei{font-size:60px;opacity:.3}
@@ -497,8 +499,23 @@ select option{background:var(--card)}
 <script>
 const CLIENT_ID='665826206801-un042lvukjcpn0nd042v0splvmm07vtc.apps.googleusercontent.com';
 const EPUB_FOLDER_NAME='Mi Biblioteca - EPUBs';
+const SHELF_STRUCTURE={
+  'Sala principal':{
+    'A':['A1','A2','A3','A4i','A4d','A5','A6','A7'],
+    'B':['B1','B2','B3','BGi','BGd','B6','B7'],
+    'C':['C1','C2','C3','C4i','C5i','C4G','C6','C7'],
+    'D':['D1','D2','D3i','D3d','D4','D5','D6','D7']
+  },
+  'Sala lectura':{
+    'E':['E1','E2','E3','E4'],
+    'F':['F1','F2','F3','F4'],
+    'G':['G1','G2','G3','G4']
+  }
+};
+function allShelfIds(){const ids=[];Object.values(SHELF_STRUCTURE).forEach(cols=>Object.values(cols).forEach(arr=>ids.push(...arr)));return ids;}
+function shelfRoom(id){if(!id)return'';for(const[room,cols]of Object.entries(SHELF_STRUCTURE))for(const arr of Object.values(cols))if(arr.includes(id))return room;return'';}
+const DOUBLE_SHELVES=['BGi','BGd','C4G'];
 const SHELVES={'Sala principal':{cols:['A','B','C','D'],rows:7},'Sala lectura':{cols:['E','F','G'],rows:4}};
-function shelfRoom(id){for(const[room,{cols}]of Object.entries(SHELVES))if(cols.some(c=>id&&id.startsWith(c)))return room;return'';}
 
 let library=[],filtered=[],selBookId=null;
 let driveFileId=null,accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
@@ -519,10 +536,17 @@ window.onload=()=>{
 function renderShelfPicker(cid,prefix){
   const el=document.getElementById(cid);if(!el)return;
   let html='';
-  Object.entries(SHELVES).forEach(([room,{cols,rows}])=>{
-    html+=`<div class="shelf-picker-room"><div class="shelf-picker-room-label">${room}</div><div class="shelf-picker-grid">`;
-    for(let r=1;r<=rows;r++)cols.forEach(c=>{const id=`${c}${r}`;html+=`<button class="sp-btn" id="spb-${prefix}-${id}" onclick="pickShelf('${prefix}','${id}')">${id}</button>`;});
-    html+=`</div></div>`;
+  Object.entries(SHELF_STRUCTURE).forEach(([room,cols])=>{
+    html+=`<div class="shelf-picker-room"><div class="shelf-picker-room-label">${room}</div>`;
+    Object.entries(cols).forEach(([col,ids])=>{
+      html+=`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px">`;
+      ids.forEach(id=>{
+        const isDouble=DOUBLE_SHELVES.includes(id);
+        html+=`<button class="sp-btn${isDouble?' sp-btn-double':''}" id="spb-${prefix}-${id}" onclick="pickShelf('${prefix}','${id}')">${id}</button>`;
+      });
+      html+=`</div>`;
+    });
+    html+=`</div>`;
   });
   el.innerHTML=html;
 }
@@ -769,7 +793,7 @@ function renderShelves(){
   if(ebooks.length){let html=`<div class="shelf-room"><div class="room-title">💻 Biblioteca digital</div><div style="display:flex;flex-wrap:wrap;gap:14px">`;html+=ebooks.map(b=>`<div class="book-card" style="width:100px" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}<div class="bc-ph" style="${b.portada_url?'display:none':''}">📖<span>${eh(b.titulo||'')}</span></div><div class="bk-info"><div class="bk-title" style="font-size:11px">${eh(b.titulo||'')}</div></div></div>`).join('');html+='</div></div>';sv.insertAdjacentHTML('beforeend',html);}
 }
 function updateDropdowns(){
-  const ests=[...new Set(library.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&b.estante).map(b=>b.estante))].sort();
+  const ests=[...new Set(library.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&b.estante).map(b=>b.estante))].sort((a,b)=>{const all=allShelfIds();return all.indexOf(a)-all.indexOf(b);});
   const gens=[...new Set(library.map(b=>b.genero).filter(Boolean))].sort();
   const cols=[...new Set(library.map(b=>b.coleccion).filter(Boolean))].sort();
   const esv=document.getElementById('f-estante').value,gnv=document.getElementById('f-genero').value,clv=document.getElementById('f-coleccion').value;
@@ -813,7 +837,7 @@ function setView(v){['grid','list','shelves'].forEach(x=>{document.getElementByI
 function openDetail(id){selBookId=id;pendingChanges=false;document.getElementById('unsaved-bar').classList.remove('show');const b=library.find(x=>x.id===id);if(!b)return;renderDetail(b);document.getElementById('detail-panel').classList.add('open');}
 function closeDetail(){if(pendingChanges&&!confirm('Tenés cambios sin guardar. ¿Cerrar igual?'))return;document.getElementById('detail-panel').classList.remove('open');selBookId=null;}
 
-function renderShelfPickerDetail(cur){let html='';Object.entries(SHELVES).forEach(([room,{cols,rows}])=>{html+=`<div class="shelf-picker-room"><div class="shelf-picker-room-label">${room}</div><div class="shelf-picker-grid">`;for(let r=1;r<=rows;r++)cols.forEach(c=>{const id=`${c}${r}`;html+=`<button class="sp-btn ${cur===id?'selected':''}" onclick="updField('estante','${id}');markUnsaved();document.querySelectorAll('#dp-shelf-picker .sp-btn').forEach(b=>b.classList.toggle('selected',b.textContent==='${id}'))">${id}</button>`;});html+=`</div></div>`;});return html;}
+function renderShelfPickerDetail(cur){let html='';Object.entries(SHELF_STRUCTURE).forEach(([room,cols])=>{html+=`<div class="shelf-picker-room"><div class="shelf-picker-room-label">${room}</div>`;Object.entries(cols).forEach(([col,ids])=>{html+=`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px">`;ids.forEach(id=>{const isDouble=DOUBLE_SHELVES.includes(id);html+=`<button class="sp-btn${isDouble?' sp-btn-double':''}${cur===id?' selected':''}" onclick="updField('estante','${id}');markUnsaved();document.querySelectorAll('#dp-shelf-picker .sp-btn').forEach(b=>b.classList.toggle('selected',b.textContent==='${id}'))">${id}</button>`;});html+=`</div>`;});html+=`</div>`;});return html;}
 
 function renderDetail(b){
   const toc=(b.indice||[]).map((r,i)=>`<tr><td><input value="${eh(r.numero||String(i+1))}" onchange="updToc(${i},'numero',this.value)" style="width:35px"></td><td><input value="${eh(r.titulo||'')}" onchange="updToc(${i},'titulo',this.value)"></td><td><input value="${eh(r.pagina||'')}" onchange="updToc(${i},'pagina',this.value)" style="width:45px"></td><td><button class="toc-del" onclick="delToc(${i})">🗑</button></td></tr>`).join('');
