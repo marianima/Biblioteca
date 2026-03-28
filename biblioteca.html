@@ -811,7 +811,7 @@ function renderShelves(){
               <span id="sc-arr-${sid}" style="font-size:11px;color:var(--text3)">▶</span>
             </div>
           </div>
-          <div id="sc-books-${sid}" style="display:none;margin-top:10px;display:none">
+          <div id="sc-books-${sid}" style="display:none;margin-top:10px">
             ${books.map(b=>`<div class="bli" onclick="event.stopPropagation();openDetail('${b.id}')" style="padding:7px 10px;margin-bottom:5px">
               ${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}
               <div class="bli-main">
@@ -826,14 +826,6 @@ function renderShelves(){
     html+='</div></div>';sv.insertAdjacentHTML('beforeend',html);
   });
   // Ebooks: solo en grilla/lista, no en estantes
-}
-function toggleShelfDetail(sid){
-  const el=document.getElementById('sc-books-'+sid);
-  const arr=document.getElementById('sc-arr-'+sid);
-  if(!el)return;
-  const open=el.style.display==='block';
-  el.style.display=open?'none':'block';
-  if(arr)arr.textContent=open?'▶':'▼';
 }
 function updateDropdowns(){
   const ests=[...new Set(library.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&b.estante).map(b=>b.estante))].sort((a,b)=>{const all=allShelfIds();return all.indexOf(a)-all.indexOf(b);});
@@ -1075,33 +1067,6 @@ function similarityScore(a, b) {
   const intersection = [...wa].filter(w => wb.has(w)).length;
   const union = new Set([...wa, ...wb]).size;
   return intersection / union;
-}
-
-// ── SHELF DETAIL TOGGLE ───────────────────────────────────
-function toggleShelfDetail(sid){
-  const books=library.filter(b=>b.estante===sid&&(b.tipo==='fisico'||b.tipo==='ambos'));
-  // Find the shelf-cell and toggle expanded list
-  const cells=document.querySelectorAll('.shelf-cell');
-  cells.forEach(cell=>{
-    const label=cell.querySelector('.shelf-label');
-    if(label&&label.textContent===sid){
-      let detail=cell.querySelector('.shelf-detail');
-      if(detail){detail.remove();return;}
-      detail=document.createElement('div');
-      detail.className='shelf-detail';
-      detail.style.cssText='margin-top:10px;border-top:1px solid var(--border);padding-top:10px';
-      detail.innerHTML=books.map(b=>`
-        <div class="bli" onclick="openDetail('${b.id}')" style="padding:7px 10px;margin-bottom:5px">
-          ${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);width:28px;height:42px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex-shrink:0">📖</div>`}
-          <div class="bli-main">
-            <div class="bli-title" style="font-size:14px">${eh(b.titulo||'')}</div>
-            <div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}</div>
-          </div>
-          ${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}
-        </div>`).join('');
-      cell.appendChild(detail);
-    }
-  });
 }
 
 // ── ISBN NORMALIZER ────────────────────────────────────────
