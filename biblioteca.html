@@ -175,8 +175,8 @@ select option{background:var(--card)}
 #prev-title{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--text)}
 #prev-author{font-size:12px;color:var(--accent);margin-top:3px}
 #prev-meta{font-size:11px;color:var(--text3);margin-top:3px}
-#cam-video{width:100%;max-height:180px;border-radius:8px;background:var(--bg3);display:none;object-fit:cover}
-#cam-photo{width:100%;max-height:180px;border-radius:8px;display:none;object-fit:cover}
+#cam-video{width:100%;max-height:320px;aspect-ratio:9/16;border-radius:8px;background:var(--bg3);display:none;object-fit:cover;max-width:180px;margin:0 auto;display:none}
+#cam-photo{width:100%;max-height:320px;aspect-ratio:9/16;border-radius:8px;display:none;object-fit:cover;max-width:180px;margin:0 auto;display:none}
 .autocomplete-wrap{position:relative}
 .autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:var(--shadow-lg);z-index:300;max-height:160px;overflow-y:auto;display:none}
 .autocomplete-list.show{display:block}
@@ -794,41 +794,73 @@ function renderGrid(){document.getElementById('books-grid').innerHTML=filtered.m
 function renderList(){document.getElementById('books-list').innerHTML=filtered.map(b=>`<div class="bli" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}<div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:12px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div><div class="bli-meta">${b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="bli-estante">${eh(b.estante)}</span>`:''}${tipoBadge(b)}${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div></div>`).join('');}
 function renderShelves(){
   const sv=document.getElementById('shelves-view');sv.innerHTML='';
+  // Heights proportional to real cm (base 30cm=44px, 1cm≈1.47px)
+  const H={
+    A1:40,A2:58,A3:37,A4i:44,A4d:44,A5:44,A6:44,A7:44,
+    B1:49,B2:43,B3:45,BGi:88,BGd:88,B6:44,B7:44,
+    C1:42,C2:43,C3:51,C4i:44,C5i:44,C4G:88,C6:44,C7:44,
+    D1:48,D2:44,D3i:42,D3d:42,D4:44,D5:44,D6:44,D7:44,
+    E1:44,E2:44,E3:44,E4:44,F1:44,F2:44,F3:44,F4:44,G1:44,G2:44,G3:44,G4:44
+  };
   Object.entries(SHELF_STRUCTURE).forEach(([room,cols])=>{
-    const roomBooks=filtered.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&shelfRoom(b.estante)===room);
-    if(!roomBooks.length)return;
     const roomEl=document.createElement('div');roomEl.className='shelf-room';
-    roomEl.innerHTML='<div class="room-title">🏠 '+room+'</div>';
-    const grid=document.createElement('div');
-    grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px';
-    Object.values(cols).forEach(ids=>{
+    const roomTitle=document.createElement('div');roomTitle.className='room-title';
+    roomTitle.innerHTML='🏠 '+room;roomEl.appendChild(roomTitle);
+    const mapWrap=document.createElement('div');
+    mapWrap.style.cssText='display:flex;gap:8px;align-items:flex-start;overflow-x:auto;padding-bottom:8px';
+    Object.entries(cols).forEach(([col,ids])=>{
+      const colEl=document.createElement('div');
+      colEl.style.cssText='display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px;max-width:200px';
+      const colLabel=document.createElement('div');
+      colLabel.style.cssText='text-align:center;font-family:"Cormorant Garamond",serif;font-size:15px;color:var(--text3);margin-bottom:2px;font-weight:500';
+      colLabel.textContent=col;colEl.appendChild(colLabel);
       ids.forEach(sid=>{
-        const books=roomBooks.filter(b=>b.estante===sid);
-        if(!books.length)return;
+        const books=library.filter(b=>b.estante===sid&&(b.tipo==='fisico'||b.tipo==='ambos'));
+        const h=H[sid]||44;
         const isDouble=DOUBLE_SHELVES.includes(sid);
-        const cell=document.createElement('div');cell.className='shelf-cell';
-        cell.style.cursor='pointer';
-        cell.onclick=()=>toggleShelfDetail(sid);
-        const hdr=document.createElement('div');hdr.className='shelf-cell-header';hdr.style.cursor='pointer';
-        hdr.innerHTML='<span class="shelf-label"'+(isDouble?' style="color:var(--accent2)"':'')+'>'+sid+'</span>'+
-          '<div class="shelf-cell-actions"><span class="shelf-count">'+books.length+' libro'+(books.length!==1?'s':'')+'</span>'+
-          '<span id="sc-arr-'+sid+'" style="font-size:11px;color:var(--text3)">▶</span></div>';
-        const booksDiv=document.createElement('div');
-        booksDiv.id='sc-books-'+sid;booksDiv.style.cssText='display:none;margin-top:10px';
-        books.forEach(b=>{
-          const row=document.createElement('div');row.className='bli';
-          row.style.cssText='padding:7px 10px;margin-bottom:5px';
-          row.onclick=e=>{e.stopPropagation();openDetail(b.id);};
-          let coverHtml='';
-          if(b.portada_url){coverHtml='<img class="bli-cover" src="'+eh(b.portada_url)+'" onerror="this.style.display=\'none\'">';}
-          else{coverHtml='<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>';}
-          row.innerHTML=coverHtml+'<div class="bli-main"><div class="bli-title" style="font-size:14px">'+eh(b.titulo||'')+'</div><div class="bli-sub">'+eh(b.autor||'')+(b.año?' · '+b.año:'')+'</div></div>';
-          booksDiv.appendChild(row);
-        });
-        cell.appendChild(hdr);cell.appendChild(booksDiv);grid.appendChild(cell);
+        const hasBooks=books.length>0;
+        const shelfWrap=document.createElement('div');
+        const cell=document.createElement('div');
+        cell.style.cssText='height:'+h+'px;border-radius:7px;border:1px solid '+(hasBooks?'var(--accent)':'var(--border)')+';background:'+(hasBooks?'var(--accent-dim)':'var(--bg2)')+';display:flex;align-items:center;justify-content:space-between;padding:0 8px;cursor:'+(hasBooks?'pointer':'default')+';transition:all .15s'+(isDouble?';border-color:var(--accent2);background:rgba(212,146,79,.1)':'');
+        cell.innerHTML='<span style="font-family:\'Cormorant Garamond\',serif;font-size:'+(isDouble?'15':'13')+'px;font-weight:500;color:'+(hasBooks?'var(--accent)':'var(--text3)')+'">'+sid+'</span>'+(hasBooks?'<span style="font-size:10px;color:var(--text2);background:var(--card);padding:1px 6px;border-radius:8px;border:1px solid var(--border)">'+books.length+'</span>':'');
+        const panel=document.createElement('div');
+        panel.id='sp-'+sid;
+        panel.style.cssText='display:none;background:var(--card);border:1px solid var(--accent);border-radius:0 0 7px 7px;margin-top:-3px;overflow:hidden;box-shadow:var(--shadow-lg);position:relative;z-index:10';
+        if(hasBooks){
+          cell.onclick=()=>{
+            const isOpen=panel.style.display==='block';
+            roomEl.querySelectorAll('[id^="sp-"]').forEach(p=>{p.style.display='none';});
+            roomEl.querySelectorAll('.shelf-map-cell-open').forEach(c=>{c.classList.remove('shelf-map-cell-open');c.style.background=c._origBg||'';c.querySelector('span').style.color=c._origColor||'';});
+            if(!isOpen){
+              panel.style.display='block';
+              cell._origBg=cell.style.background;
+              cell._origColor=cell.querySelector('span').style.color;
+              cell.classList.add('shelf-map-cell-open');
+              cell.style.background='var(--accent)';
+              cell.style.borderRadius='7px 7px 0 0';
+              cell.querySelector('span').style.color='#fff';
+            } else {
+              cell.style.borderRadius='7px';
+            }
+          };
+          books.forEach(b=>{
+            const row=document.createElement('div');
+            row.style.cssText='display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s';
+            row.onmouseenter=()=>row.style.background='var(--bg3)';
+            row.onmouseleave=()=>row.style.background='';
+            row.onclick=()=>openDetail(b.id);
+            const covHtml=b.portada_url
+              ?'<img src="'+eh(b.portada_url)+'" style="width:28px;height:42px;object-fit:cover;border-radius:3px;flex-shrink:0" onerror="this.style.display=\'none\'">'
+              :'<div style="width:28px;height:42px;background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">📖</div>';
+            row.innerHTML=covHtml+'<div style="flex:1;min-width:0"><div style="font-family:\'Cormorant Garamond\',serif;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+eh(b.titulo||'')+'</div><div style="font-size:11px;color:var(--text3)">'+eh(b.autor||'')+(b.año?' · '+b.año:'')+'</div></div>';
+            panel.appendChild(row);
+          });
+        }
+        shelfWrap.appendChild(cell);shelfWrap.appendChild(panel);colEl.appendChild(shelfWrap);
       });
+      mapWrap.appendChild(colEl);
     });
-    roomEl.appendChild(grid);sv.appendChild(roomEl);
+    roomEl.appendChild(mapWrap);sv.appendChild(roomEl);
   });
 }
 function updateDropdowns(){
@@ -1173,7 +1205,21 @@ function openAdd(){
   initAutocompletes();
 }
 function closeAdd(){document.getElementById('add-modal').classList.remove('open');stopCam();window._pendingMergeId=null;}
-function switchTab(t){['search','camera','digital','manual'].forEach(x=>{document.getElementById('tc-'+x).style.display='none';document.getElementById('tab-'+x).classList.remove('active');});document.getElementById('tc-'+t).style.display='block';document.getElementById('tab-'+t).classList.add('active');if(t!=='camera')stopCam();if(t==='manual'||t==='digital')document.getElementById('sel-preview').style.display='none';if(t==='manual')initAutocompletes();}
+function switchTab(t){
+  ['search','camera','digital','manual'].forEach(x=>{
+    document.getElementById('tc-'+x).style.display='none';
+    document.getElementById('tab-'+x).classList.remove('active');
+  });
+  document.getElementById('tc-'+t).style.display='block';
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t!=='camera')stopCam();
+  // Solo ocultar preview al cambiar a tabs donde no aplica
+  if(t==='manual'||t==='digital'){
+    document.getElementById('sel-preview').style.display='none';
+    selBookData=null;
+  }
+  if(t==='manual')initAutocompletes();
+}
 function toggleManualFields(){const t=document.getElementById('m-tipo').value;document.getElementById('m-fisico-fields').style.display=t==='fisico'?'block':'none';}
 function togglePreviewFields(){const t=document.getElementById('prev-tipo').value;document.getElementById('prev-fisico-fields').style.display=t==='fisico'?'block':'none';}
 function setDzTab(t){currentDzTab=t;['files','folder','drive'].forEach(x=>{document.getElementById('dz-'+x+'-zone').style.display=x===t?'block':'none';document.getElementById('dzt-'+x).classList.toggle('active',x===t);});}
