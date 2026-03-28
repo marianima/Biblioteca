@@ -797,35 +797,39 @@ function renderShelves(){
   Object.entries(SHELF_STRUCTURE).forEach(([room,cols])=>{
     const roomBooks=filtered.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&shelfRoom(b.estante)===room);
     if(!roomBooks.length)return;
-    let html=`<div class="shelf-room"><div class="room-title">🏠 ${room}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">`;
-    // Iterar por los IDs reales de cada columna
+    const roomEl=document.createElement('div');roomEl.className='shelf-room';
+    roomEl.innerHTML='<div class="room-title">🏠 '+room+'</div>';
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px';
     Object.values(cols).forEach(ids=>{
       ids.forEach(sid=>{
         const books=roomBooks.filter(b=>b.estante===sid);
         if(!books.length)return;
-        html+=`<div class="shelf-cell" onclick="toggleShelfDetail('${sid}')">
-          <div class="shelf-cell-header" style="cursor:pointer">
-            <span class="shelf-label" style="${DOUBLE_SHELVES.includes(sid)?'color:var(--accent2)':''}">${sid}</span>
-            <div class="shelf-cell-actions">
-              <span class="shelf-count">${books.length} libro${books.length!==1?'s':''}</span>
-              <span id="sc-arr-${sid}" style="font-size:11px;color:var(--text3)">▶</span>
-            </div>
-          </div>
-          <div id="sc-books-${sid}" style="display:none;margin-top:10px">
-            ${books.map(b=>`<div class="bli" onclick="event.stopPropagation();openDetail('${b.id}')" style="padding:7px 10px;margin-bottom:5px">
-              ${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}
-              <div class="bli-main">
-                <div class="bli-title" style="font-size:14px">${eh(b.titulo||'')}</div>
-                <div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}</div>
-              </div>
-            </div>`).join('')}
-          </div>
-        </div>`;
+        const isDouble=DOUBLE_SHELVES.includes(sid);
+        const cell=document.createElement('div');cell.className='shelf-cell';
+        cell.style.cursor='pointer';
+        cell.onclick=()=>toggleShelfDetail(sid);
+        const hdr=document.createElement('div');hdr.className='shelf-cell-header';hdr.style.cursor='pointer';
+        hdr.innerHTML='<span class="shelf-label"'+(isDouble?' style="color:var(--accent2)"':'')+'>'+sid+'</span>'+
+          '<div class="shelf-cell-actions"><span class="shelf-count">'+books.length+' libro'+(books.length!==1?'s':'')+'</span>'+
+          '<span id="sc-arr-'+sid+'" style="font-size:11px;color:var(--text3)">▶</span></div>';
+        const booksDiv=document.createElement('div');
+        booksDiv.id='sc-books-'+sid;booksDiv.style.cssText='display:none;margin-top:10px';
+        books.forEach(b=>{
+          const row=document.createElement('div');row.className='bli';
+          row.style.cssText='padding:7px 10px;margin-bottom:5px';
+          row.onclick=e=>{e.stopPropagation();openDetail(b.id);};
+          let coverHtml='';
+          if(b.portada_url){coverHtml='<img class="bli-cover" src="'+eh(b.portada_url)+'" onerror="this.style.display=\'none\'">';}
+          else{coverHtml='<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>';}
+          row.innerHTML=coverHtml+'<div class="bli-main"><div class="bli-title" style="font-size:14px">'+eh(b.titulo||'')+'</div><div class="bli-sub">'+eh(b.autor||'')+(b.año?' · '+b.año:'')+'</div></div>';
+          booksDiv.appendChild(row);
+        });
+        cell.appendChild(hdr);cell.appendChild(booksDiv);grid.appendChild(cell);
       });
     });
-    html+='</div></div>';sv.insertAdjacentHTML('beforeend',html);
+    roomEl.appendChild(grid);sv.appendChild(roomEl);
   });
-  // Ebooks: solo en grilla/lista, no en estantes
 }
 function updateDropdowns(){
   const ests=[...new Set(library.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&b.estante).map(b=>b.estante))].sort((a,b)=>{const all=allShelfIds();return all.indexOf(a)-all.indexOf(b);});
@@ -1193,6 +1197,7 @@ async function fetchBooks(q){
     try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=4`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};const k=(info.title||'')+((info.authors||[])[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?info.publishedDate.substring(0,4):'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});}});}catch(e){}}
   return res;
 }
+async function selectBook(i,ctx){
   const results=ctx==='s'?_sRes:_cRes;const bk=results[i];if(!bk)return;
   selBookData={...bk};
   document.querySelectorAll(`#${ctx==='s'?'s-results':'cam-results'} .sri`).forEach((el,j)=>el.classList.toggle('sel',j===i));
