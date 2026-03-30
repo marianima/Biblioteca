@@ -94,6 +94,18 @@ select option{background:var(--card)}
 .shelf-cell-actions{display:flex;align-items:center;gap:6px}
 .shelf-count{font-size:11px;color:var(--text3);background:var(--bg3);padding:1px 7px;border-radius:8px}
 .shelf-books-row{display:flex;flex-wrap:wrap;gap:10px}
+/* ── WOOD SHELF MAP ── */
+.shelf-map-bg{background:linear-gradient(160deg,#c4956a 0%,#a8783a 50%,#8c611e 100%);border-radius:14px;padding:18px 14px 22px;box-shadow:0 6px 28px rgba(80,45,10,.3),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -2px 0 rgba(0,0,0,.15)}
+.shelf-col-header{text-align:center;font-family:'Cormorant Garamond',serif;font-size:16px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.shelf-plank{border-radius:4px;position:relative;transition:filter .15s;border-bottom:3px solid rgba(0,0,0,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.shelf-plank.empty{background:rgba(0,0,0,.12)}
+.shelf-plank.filled{background:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.04) 100%);cursor:pointer}
+.shelf-plank.filled:hover{filter:brightness(1.15)}
+.shelf-plank.active{background:rgba(255,255,255,.25)!important;border-bottom-color:rgba(0,0,0,.15)}
+.shelf-plank-inner{display:flex;align-items:center;justify-content:space-between;padding:0 8px;height:100%}
+.shelf-plank-lbl{font-family:'Cormorant Garamond',serif;font-weight:600;color:rgba(255,255,255,.95);text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.shelf-plank-cnt{background:rgba(0,0,0,.25);color:rgba(255,255,255,.9);font-size:10px;padding:1px 7px;border-radius:8px;font-weight:500}
+.shelf-expand-panel{background:var(--card);border:1px solid var(--border2);overflow:hidden;box-shadow:var(--shadow-lg);border-radius:0 0 8px 8px;margin-top:-2px;position:relative;z-index:5}
 #detail-panel{width:360px;flex-shrink:0;background:var(--card);border-left:1px solid var(--border);overflow-y:auto;display:none;flex-direction:column;box-shadow:-2px 0 12px rgba(60,45,20,.06)}
 #detail-panel.open{display:flex}
 #dp-header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
@@ -489,7 +501,20 @@ select option{background:var(--card)}
         </div>
         <div style="display:flex;gap:8px;margin-top:6px">
           <button class="btn btn-ghost" style="flex:1" onclick="buscarMasInfo()">🔍 Buscar info online</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="buscarPortadaManual()">🖼 Buscar portada</button>
           <button class="btn btn-accent" style="flex:1" onclick="addManual()">✅ Agregar</button>
+        </div>
+        <!-- Cover preview -->
+        <div id="m-cover-wrap" style="display:none;margin-top:10px;display:none;align-items:center;gap:12px;background:var(--bg);border-radius:8px;padding:10px;border:1px solid var(--border)">
+          <img id="m-cover-preview" style="width:50px;height:75px;object-fit:cover;border-radius:4px;box-shadow:var(--shadow)">
+          <div style="flex:1">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="m-cover-source">Portada encontrada</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-accent btn-sm" onclick="usarPortada()">✓ Usar esta</button>
+              <button class="btn btn-ghost btn-sm" onclick="buscarPortadaManual(true)">↻ Buscar otra</button>
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer">📁 Subir<input type="file" accept="image/*" style="display:none" onchange="subirPortadaManual(event)"></label>
+            </div>
+          </div>
         </div>
         <!-- Colección picker dropdown -->
         <div id="coleccion-picker" style="display:none;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-top:8px;box-shadow:var(--shadow-lg)">
@@ -811,7 +836,7 @@ function renderGrid(){document.getElementById('books-grid').innerHTML=filtered.m
 function renderList(){document.getElementById('books-list').innerHTML=filtered.map(b=>`<div class="bli" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}<div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:12px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div><div class="bli-meta">${b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="bli-estante">${eh(b.estante)}</span>`:''}${tipoBadge(b)}${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div></div>`).join('');}
 function renderShelves(){
   const sv=document.getElementById('shelves-view');sv.innerHTML='';
-  // Heights proportional to real cm (base 30cm=44px, 1cm≈1.47px)
+  // Heights proportional to real cm (base 30cm=44px)
   const H={
     A1:40,A2:58,A3:37,A4i:44,A4d:44,A5:44,A6:44,A7:44,
     B1:49,B2:43,B3:45,BGi:88,BGd:88,B6:44,B7:44,
@@ -819,66 +844,117 @@ function renderShelves(){
     D1:48,D2:44,D3i:42,D3d:42,D4:44,D5:44,D6:44,D7:44,
     E1:44,E2:44,E3:44,E4:44,F1:44,F2:44,F3:44,F4:44,G1:44,G2:44,G3:44,G4:44
   };
+  // Shelves that share a row (side by side)
+  const PAIRED={'A4i':'A4d','BGi':'BGd','C4i':'C4i','D3i':'D3d'};
+  const PAIR_RIGHT=new Set(['A4d','BGd','C5i','C4G','D3d']);
+
   Object.entries(SHELF_STRUCTURE).forEach(([room,cols])=>{
     const roomEl=document.createElement('div');roomEl.className='shelf-room';
     const roomTitle=document.createElement('div');roomTitle.className='room-title';
-    roomTitle.innerHTML='🏠 '+room;roomEl.appendChild(roomTitle);
-    const mapWrap=document.createElement('div');
-    mapWrap.style.cssText='display:flex;gap:8px;align-items:flex-start;overflow-x:auto;padding-bottom:8px';
+    roomTitle.textContent='🏠 '+room;roomEl.appendChild(roomTitle);
+
+    // Wood background
+    const woodBg=document.createElement('div');woodBg.className='shelf-map-bg';
+    woodBg.style.cssText='display:flex;gap:10px;overflow-x:auto';
+
     Object.entries(cols).forEach(([col,ids])=>{
-      const colEl=document.createElement('div');
-      colEl.style.cssText='display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px;max-width:200px';
-      const colLabel=document.createElement('div');
-      colLabel.style.cssText='text-align:center;font-family:"Cormorant Garamond",serif;font-size:15px;color:var(--text3);margin-bottom:2px;font-weight:500';
-      colLabel.textContent=col;colEl.appendChild(colLabel);
+      const colWrap=document.createElement('div');
+      colWrap.style.cssText='display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px';
+
+      // Column label
+      const colLbl=document.createElement('div');
+      colLbl.className='shelf-col-header';colLbl.textContent=col;colWrap.appendChild(colLbl);
+
+      // Track which ids to skip (already rendered as pair)
+      const skip=new Set();
       ids.forEach(sid=>{
-        const books=library.filter(b=>b.estante===sid&&(b.tipo==='fisico'||b.tipo==='ambos'));
+        if(skip.has(sid))return;
+
+        // Check if this shelf has a paired partner
+        const pairMap={'A4i':'A4d','BGi':'BGd','C4i':'C5i','D3i':'D3d','C4G':null};
+        const partnerRight=pairMap[sid];
+        const isPairLeft=partnerRight!==undefined&&ids.includes(partnerRight);
+        if(isPairLeft&&partnerRight){skip.add(partnerRight);}
+
         const h=H[sid]||44;
-        const isDouble=DOUBLE_SHELVES.includes(sid);
+        const books=library.filter(b=>b.estante===sid&&(b.tipo==='fisico'||b.tipo==='ambos'));
         const hasBooks=books.length>0;
-        const shelfWrap=document.createElement('div');
-        const cell=document.createElement('div');
-        cell.style.cssText='height:'+h+'px;border-radius:7px;border:1px solid '+(hasBooks?'var(--accent)':'var(--border)')+';background:'+(hasBooks?'var(--accent-dim)':'var(--bg2)')+';display:flex;align-items:center;justify-content:space-between;padding:0 8px;cursor:'+(hasBooks?'pointer':'default')+';transition:all .15s'+(isDouble?';border-color:var(--accent2);background:rgba(212,146,79,.1)':'');
-        cell.innerHTML='<span style="font-family:\'Cormorant Garamond\',serif;font-size:'+(isDouble?'15':'13')+'px;font-weight:500;color:'+(hasBooks?'var(--accent)':'var(--text3)')+'">'+sid+'</span>'+(hasBooks?'<span style="font-size:10px;color:var(--text2);background:var(--card);padding:1px 6px;border-radius:8px;border:1px solid var(--border)">'+books.length+'</span>':'');
-        const panel=document.createElement('div');
-        panel.id='sp-'+sid;
-        panel.style.cssText='display:none;background:var(--card);border:1px solid var(--accent);border-radius:0 0 7px 7px;margin-top:-3px;overflow:hidden;box-shadow:var(--shadow-lg);position:relative;z-index:10';
-        if(hasBooks){
-          cell.onclick=()=>{
-            const isOpen=panel.style.display==='block';
-            roomEl.querySelectorAll('[id^="sp-"]').forEach(p=>{p.style.display='none';});
-            roomEl.querySelectorAll('.shelf-map-cell-open').forEach(c=>{c.classList.remove('shelf-map-cell-open');c.style.background=c._origBg||'';c.querySelector('span').style.color=c._origColor||'';});
-            if(!isOpen){
-              panel.style.display='block';
-              cell._origBg=cell.style.background;
-              cell._origColor=cell.querySelector('span').style.color;
-              cell.classList.add('shelf-map-cell-open');
-              cell.style.background='var(--accent)';
-              cell.style.borderRadius='7px 7px 0 0';
-              cell.querySelector('span').style.color='#fff';
-            } else {
-              cell.style.borderRadius='7px';
-            }
-          };
-          books.forEach(b=>{
-            const row=document.createElement('div');
-            row.style.cssText='display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s';
-            row.onmouseenter=()=>row.style.background='var(--bg3)';
-            row.onmouseleave=()=>row.style.background='';
-            row.onclick=()=>openDetail(b.id);
-            const covHtml=b.portada_url
-              ?'<img src="'+eh(b.portada_url)+'" style="width:28px;height:42px;object-fit:cover;border-radius:3px;flex-shrink:0" onerror="this.style.display=\'none\'">'
-              :'<div style="width:28px;height:42px;background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">📖</div>';
-            row.innerHTML=covHtml+'<div style="flex:1;min-width:0"><div style="font-family:\'Cormorant Garamond\',serif;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+eh(b.titulo||'')+'</div><div style="font-size:11px;color:var(--text3)">'+eh(b.autor||'')+(b.año?' · '+b.año:'')+'</div></div>';
-            panel.appendChild(row);
+
+        if(isPairLeft&&partnerRight){
+          // Render two side-by-side shelves in a flex row
+          const hRight=H[partnerRight]||44;
+          const booksRight=library.filter(b=>b.estante===partnerRight&&(b.tipo==='fisico'||b.tipo==='ambos'));
+          const rowWrap=document.createElement('div');
+          rowWrap.style.cssText='display:flex;gap:4px';
+          [sid,partnerRight].forEach((id,idx)=>{
+            const bks=idx===0?books:booksRight;
+            const hh=idx===0?h:hRight;
+            const hw=idx===0?books:booksRight;
+            const hasBks=bks.length>0;
+            const plank=makePlank(id,hh,bks,hasBks,DOUBLE_SHELVES.includes(id),roomEl);
+            plank.style.flex='1';rowWrap.appendChild(plank);
           });
+          colWrap.appendChild(rowWrap);
+        } else if(sid==='C4G'){
+          // C4G is double height, rendered after C4i/C5i pair — skip, handled above
+          // Actually render it separately as a tall plank
+          const plank=makePlank(sid,H['C4G']||88,books,hasBooks,true,roomEl);
+          // It should appear in the same row as C4i/C5i — this is complex,
+          // so render it full width below the pair instead
+          colWrap.appendChild(plank);
+        } else {
+          const plank=makePlank(sid,h,books,hasBooks,DOUBLE_SHELVES.includes(sid),roomEl);
+          colWrap.appendChild(plank);
         }
-        shelfWrap.appendChild(cell);shelfWrap.appendChild(panel);colEl.appendChild(shelfWrap);
       });
-      mapWrap.appendChild(colEl);
+      woodBg.appendChild(colWrap);
     });
-    roomEl.appendChild(mapWrap);sv.appendChild(roomEl);
+    roomEl.appendChild(woodBg);sv.appendChild(roomEl);
   });
+}
+
+function makePlank(sid,h,books,hasBooks,isDouble,roomEl){
+  const wrap=document.createElement('div');
+  const plank=document.createElement('div');
+  plank.className='shelf-plank '+(hasBooks?'filled':'empty');
+  plank.style.cssText='height:'+h+'px';
+  const inner=document.createElement('div');inner.className='shelf-plank-inner';
+  const lbl=document.createElement('span');lbl.className='shelf-plank-lbl';
+  lbl.style.fontSize=(isDouble?'15':'13')+'px';lbl.textContent=sid;
+  inner.appendChild(lbl);
+  if(hasBooks){
+    const cnt=document.createElement('span');cnt.className='shelf-plank-cnt';
+    cnt.textContent=books.length;inner.appendChild(cnt);
+  }
+  plank.appendChild(inner);
+
+  // Expand panel
+  const panel=document.createElement('div');panel.className='shelf-expand-panel';
+  panel.id='sp-'+sid;panel.style.display='none';
+
+  if(hasBooks){
+    plank.onclick=()=>{
+      const isOpen=panel.style.display==='block';
+      // Close all panels in same room
+      roomEl.querySelectorAll('.shelf-expand-panel').forEach(p=>p.style.display='none');
+      roomEl.querySelectorAll('.shelf-plank.active').forEach(p=>p.classList.remove('active'));
+      if(!isOpen){panel.style.display='block';plank.classList.add('active');}
+    };
+    books.forEach(b=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s';
+      row.onmouseenter=()=>row.style.background='var(--bg3)';
+      row.onmouseleave=()=>row.style.background='';
+      row.onclick=()=>openDetail(b.id);
+      const cov=b.portada_url
+        ?'<img src="'+eh(b.portada_url)+'" style="width:28px;height:42px;object-fit:cover;border-radius:3px;flex-shrink:0" onerror="this.style.display=\'none\'">'
+        :'<div style="width:28px;height:42px;background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">📖</div>';
+      row.innerHTML=cov+'<div style="flex:1;min-width:0"><div style="font-family:\'Cormorant Garamond\',serif;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+eh(b.titulo||'')+'</div><div style="font-size:11px;color:var(--text3)">'+eh(b.autor||'')+(b.año?' · '+b.año:'')+'</div></div>';
+      panel.appendChild(row);
+    });
+  }
+  wrap.appendChild(plank);wrap.appendChild(panel);
+  return wrap;
 }
 function updateDropdowns(){
   const ests=[...new Set(library.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&b.estante).map(b=>b.estante))].sort((a,b)=>{const all=allShelfIds();return all.indexOf(a)-all.indexOf(b);});
@@ -1222,7 +1298,8 @@ function openAdd(){
   initAutocompletes();
   // Reset manual search cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
-  _coleccionMode=null;
+  _coleccionMode=null;_coverResults=[];_coverIdx=0;
+  const cw=document.getElementById('m-cover-wrap');if(cw)cw.style.display='none';
 }
 function closeAdd(){document.getElementById('add-modal').classList.remove('open');stopCam();window._pendingMergeId=null;}
 function switchTab(t){
@@ -1309,6 +1386,55 @@ async function addSelected(){
   const existing=checkForDuplicate(nb);
   if(existing){showMergePrompt(existing,nb,async()=>{await saveToDrive();renderLib();closeAdd();toast('Unificados ✓','ok');openDetail(existing.id);},async()=>{library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);});}
   else{library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);}
+}
+
+let _coverResults=[];let _coverIdx=0;
+async function buscarPortadaManual(next=false){
+  const titulo=document.getElementById('m-titulo').value.trim();
+  const autor=document.getElementById('m-autor').value.trim();
+  const isbn=document.getElementById('m-isbn').value.trim();
+  if(!titulo&&!isbn){toast('Ingresá el título para buscar portada','err');return;}
+  if(!next){_coverResults=[];_coverIdx=0;}
+  else{_coverIdx=(_coverIdx+1)%Math.max(1,_coverResults.length);}
+  toast('Buscando portada...','info');
+  try{
+    if(!_coverResults.length||next&&_coverResults.length<=1){
+      const covers=[];
+      // Open Library por ISBN
+      if(isbn){try{const r=await fetch(`https://covers.openlibrary.org/b/isbn/${isbn.replace(/[-\s]/g,'')}-L.jpg?default=false`);if(r.ok)covers.push({url:r.url,source:'Open Library (ISBN)'});}catch(e){}}
+      // Open Library por título
+      try{const r=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(titulo)}&author=${encodeURIComponent(autor||'')}&limit=8&fields=cover_i,title,author_name,publisher`);const d=await r.json();(d.docs||[]).filter(b=>b.cover_i).forEach(b=>{covers.push({url:`https://covers.openlibrary.org/b/id/${b.cover_i}-L.jpg`,source:`Open Library: ${b.title||titulo}`});});}catch(e){}
+      // Google Books por título+autor
+      try{const q=(isbn?`isbn:${isbn.replace(/[-\s]/g,'')}`:`${titulo} ${autor}`).trim();const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=8`);const d=await r.json();(d.items||[]).filter(i=>i.volumeInfo?.imageLinks).forEach(i=>{const img=i.volumeInfo.imageLinks;const url=(img.extraLarge||img.large||img.medium||img.thumbnail||'').replace('http:','https:').replace('zoom=1','zoom=3');if(url)covers.push({url,source:`Google Books: ${i.volumeInfo.title||titulo}`});});}catch(e){}
+      _coverResults=covers;_coverIdx=0;
+    }
+    if(!_coverResults.length){toast('No se encontró portada — subila manualmente','info');return;}
+    const cover=_coverResults[_coverIdx];
+    window._manualCover=cover.url;
+    const wrap=document.getElementById('m-cover-wrap');
+    const img=document.getElementById('m-cover-preview');
+    const src=document.getElementById('m-cover-source');
+    img.src=cover.url;
+    img.onload=()=>{wrap.style.display='flex';};
+    src.textContent=cover.source+(_coverResults.length>1?` (${_coverIdx+1}/${_coverResults.length})`:'');
+  }catch(e){toast('Error buscando portada','err');}
+}
+function usarPortada(){
+  if(window._manualCover)toast('Portada guardada ✓','ok');
+  document.getElementById('m-cover-wrap').style.display='none';
+}
+function subirPortadaManual(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    window._manualCover=e.target.result;
+    const img=document.getElementById('m-cover-preview');
+    img.src=e.target.result;
+    document.getElementById('m-cover-wrap').style.display='flex';
+    document.getElementById('m-cover-source').textContent='Imagen subida manualmente';
+    toast('Portada cargada ✓','ok');
+  };
+  reader.readAsDataURL(file);
 }
 
 async function buscarMasInfo(){
