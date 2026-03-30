@@ -461,10 +461,14 @@ select option{background:var(--card)}
       </div>
 
       <div id="tc-manual" style="display:none">
+        <div id="m-coleccion-banner" style="display:none;background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--accent);display:none;align-items:center;justify-content:space-between">
+          <span id="m-coleccion-banner-txt">📚 Cargando desde colección</span>
+          <button onclick="clearColeccionMode()" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:13px">✕</button>
+        </div>
         <div class="fg">
           <div class="fr"><label class="fl">Título *</label><input type="text" id="m-titulo"></div>
           <div class="fr"><label class="fl">Autor *</label><input type="text" id="m-autor"></div>
-          <div class="fr"><label class="fl">ISBN</label><input type="text" id="m-isbn"></div>
+          <div class="fr"><label class="fl">ISBN</label><input type="text" id="m-isbn" placeholder="9788426481238"></div>
           <div class="fr"><label class="fl">Año</label><input type="number" id="m-año"></div>
           <div class="fr"><label class="fl">Editorial</label><input type="text" id="m-editorial"></div>
           <div class="fr"><label class="fl">Idioma</label><input type="text" id="m-idioma" value="Español"></div>
@@ -476,9 +480,22 @@ select option{background:var(--card)}
         </div>
         <div id="m-fisico-fields">
           <div class="fr"><label class="fl">Estante</label><div id="m-shelf-picker"></div></div>
-          <div class="fr"><label class="fl">Colección</label><input type="text" id="m-coleccion" placeholder="Ej: Harry Potter"></div>
+          <div class="fr"><label class="fl">Colección</label>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="m-coleccion" placeholder="Ej: Harry Potter">
+              <button class="btn btn-ghost btn-sm" onclick="openColeccionPicker()" title="Cargar desde colección existente" style="flex-shrink:0">📚</button>
+            </div>
+          </div>
         </div>
-        <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="addManual()">✅ Agregar</button>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn btn-ghost" style="flex:1" onclick="buscarMasInfo()">🔍 Buscar info online</button>
+          <button class="btn btn-accent" style="flex:1" onclick="addManual()">✅ Agregar</button>
+        </div>
+        <!-- Colección picker dropdown -->
+        <div id="coleccion-picker" style="display:none;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-top:8px;box-shadow:var(--shadow-lg)">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Elegí una colección</div>
+          <div id="coleccion-picker-list" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto"></div>
+        </div>
       </div>
 
       <div id="sel-preview">
@@ -1203,6 +1220,9 @@ function openAdd(){
   switchTab('search');
   // Init autocompletes para el tab manual
   initAutocompletes();
+  // Reset manual search cache
+  window._manualCover='';window._manualDesc='';window._manualBio='';
+  _coleccionMode=null;
 }
 function closeAdd(){document.getElementById('add-modal').classList.remove('open');stopCam();window._pendingMergeId=null;}
 function switchTab(t){
@@ -1230,17 +1250,29 @@ function srHTML(b,i,ctx){return`<div class="sri" onclick="selectBook(${i},'${ctx
 
 async function fetchBooks(q){
   const res=[],seen=new Set();
-  // Open Library Spanish
-  try{const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&lang=spa&limit=6&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);const d=await r.json();(d.docs||[]).forEach(b=>{const k=(b.title||'')+(b.author_name?.[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'es',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});}});}catch(e){}
-  // Open Library broader search if few results
-  if(res.length<3){try{const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=5&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);const d=await r.json();(d.docs||[]).forEach(b=>{const k=(b.title||'')+(b.author_name?.[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});}});}catch(e){}}
-  // Google Books Spanish
-  try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};const k=(info.title||'')+((info.authors||[])[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?info.publishedDate.substring(0,4):'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'es',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});}});}catch(e){}
-  // Google Books broader fallback (sin restricción de idioma)
-  if(res.length<3){try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=4`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};const k=(info.title||'')+((info.authors||[])[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?info.publishedDate.substring(0,4):'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});}});}catch(e){}}
-  // Google Books broader search (no language restriction) as fallback
-  if(res.length<3){
-    try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=4`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};const k=(info.title||'')+((info.authors||[])[0]||'');if(!seen.has(k)){seen.add(k);res.push({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?info.publishedDate.substring(0,4):'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});}});}catch(e){}}
+  const addBook=(b)=>{const k=(b.titulo||'')+(b.autor||'').split(',')[0];if(!seen.has(k)&&b.titulo){seen.add(k);res.push(b);}};
+
+  // Si parece ISBN (solo números, 10 o 13 dígitos), buscar directo por ISBN primero
+  const cleanQ=q.replace(/[-\s]/g,'');
+  if(/^\d{10,13}$/.test(cleanQ)){
+    // Open Library por ISBN directo
+    try{const r=await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${cleanQ}&format=json&jscmd=data`);const d=await r.json();const bk=d[`ISBN:${cleanQ}`];if(bk){addBook({titulo:bk.title||'',autor:(bk.authors||[]).map(a=>a.name).join(', '),año:bk.publish_date?.match(/\d{4}/)?.[0]||'',isbn:cleanQ,editorial:(bk.publishers||[]).map(p=>p.name).join(', '),idioma:'',paginas:bk.number_of_pages||'',cover:bk.cover?.large||bk.cover?.medium||'',descripcion:'',genero:'',olKey:'',source:'Open Library ISBN'});}}catch(e){}
+    // Google Books por ISBN directo
+    try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanQ}`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};addBook({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||cleanQ,editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:').replace('zoom=1','zoom=3')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books ISBN'});});}catch(e){}
+  }
+
+  // Open Library búsqueda en español
+  try{const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&lang=spa&limit=6&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);const d=await r.json();(d.docs||[]).forEach(b=>{addBook({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'es',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});});}catch(e){}
+
+  // Open Library búsqueda general (sin restricción de idioma)
+  if(res.length<4){try{const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=6&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);const d=await r.json();(d.docs||[]).forEach(b=>{addBook({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});});}catch(e){}}
+
+  // Google Books en español
+  try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};addBook({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'es',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});});}catch(e){}
+
+  // Google Books sin restricción de idioma
+  if(res.length<4){try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};addBook({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});});}catch(e){}}
+
   return res;
 }
 async function selectBook(i,ctx){
@@ -1279,10 +1311,98 @@ async function addSelected(){
   else{library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);}
 }
 
+async function buscarMasInfo(){
+  const titulo=document.getElementById('m-titulo').value.trim();
+  const autor=document.getElementById('m-autor').value.trim();
+  const isbn=document.getElementById('m-isbn').value.trim();
+  const q=isbn||titulo+(autor?' '+autor:'');
+  if(!q){toast('Ingresá al menos el título para buscar','err');return;}
+  toast('Buscando información online...','info');
+  try{
+    const results=await fetchBooks(q);
+    if(!results.length){toast('No se encontró información adicional','info');return;}
+    const m=results[0];
+    // Completar solo los campos vacíos
+    if(m.titulo&&!document.getElementById('m-titulo').value.trim())document.getElementById('m-titulo').value=m.titulo;
+    if(m.autor&&!document.getElementById('m-autor').value.trim())document.getElementById('m-autor').value=m.autor;
+    if(m.isbn&&!document.getElementById('m-isbn').value.trim())document.getElementById('m-isbn').value=m.isbn;
+    if(m.año&&!document.getElementById('m-año').value)document.getElementById('m-año').value=m.año;
+    if(m.editorial&&!document.getElementById('m-editorial').value.trim())document.getElementById('m-editorial').value=m.editorial;
+    if(m.genero&&!document.getElementById('m-genero').value.trim())document.getElementById('m-genero').value=m.genero;
+    if(m.paginas&&!document.getElementById('m-paginas').value)document.getElementById('m-paginas').value=m.paginas;
+    if(m.idioma&&document.getElementById('m-idioma').value==='Español'&&m.idioma!=='es')document.getElementById('m-idioma').value=m.idioma;
+    // Guardar portada para usar al agregar
+    if(m.cover)window._manualCover=m.cover;
+    if(m.descripcion)window._manualDesc=m.descripcion;
+    // Bio del autor si tiene olKey
+    if(m.olKey){try{const wr=await fetch(`https://openlibrary.org${m.olKey}.json`);const wd=await wr.json();if(wd.authors?.length){const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);const ad=await ar.json();if(ad.bio)window._manualBio=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';}}catch(e){}}
+    // Wikipedia bio
+    if((autor||m.autor)&&!window._manualBio){try{const wikiR=await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(autor||m.autor)}`);if(wikiR.ok){const wikiD=await wikiR.json();if(wikiD.extract&&wikiD.extract.length>50&&wikiD.type!=='disambiguation')window._manualBio=wikiD.extract;}}catch(e){}}
+    toast(`Info encontrada en ${m.source} ✓`,'ok');
+    if(m.cover){
+      const prev=document.getElementById('m-cover-preview');
+      if(prev){prev.src=m.cover;prev.style.display='block';}
+    }
+  }catch(e){toast('Error buscando','err');}
+}
+
+let _coleccionMode=null;
+function openColeccionPicker(){
+  const picker=document.getElementById('coleccion-picker');
+  if(picker.style.display==='block'){picker.style.display='none';return;}
+  const cols=[...new Set(library.filter(b=>b.coleccion).map(b=>b.coleccion))].sort();
+  if(!cols.length){toast('No hay colecciones cargadas aún','info');return;}
+  const list=document.getElementById('coleccion-picker-list');
+  list.innerHTML=cols.map(c=>{
+    const bks=library.filter(b=>b.coleccion===c);
+    const sample=bks[0]||{};
+    return`<div onclick="loadColeccion('${eh(c)}')" style="padding:9px 12px;border-radius:7px;border:1px solid var(--border);cursor:pointer;background:var(--bg);transition:all .14s" onmouseenter="this.style.background='var(--accent-dim)'" onmouseleave="this.style.background='var(--bg)'">
+      <div style="font-size:13px;font-weight:500;color:var(--accent)">📚 ${eh(c)}</div>
+      <div style="font-size:11px;color:var(--text3)">${bks.length} libro${bks.length!==1?'s':''} · ${eh(sample.editorial||'')}${sample.genero?' · '+eh(sample.genero):''}</div>
+    </div>`;
+  }).join('');
+  picker.style.display='block';
+}
+function loadColeccion(col){
+  const sample=library.find(b=>b.coleccion===col);
+  if(!sample)return;
+  document.getElementById('m-coleccion').value=col;
+  if(sample.editorial)document.getElementById('m-editorial').value=sample.editorial;
+  if(sample.genero)document.getElementById('m-genero').value=sample.genero;
+  if(sample.idioma)document.getElementById('m-idioma').value=sample.idioma;
+  if(sample.estante&&!_mShelf){
+    _mShelf=sample.estante;
+    document.querySelectorAll('[id^="spb-m-"]').forEach(b=>b.classList.toggle('selected',b.id===`spb-m-${sample.estante}`));
+  }
+  _coleccionMode=col;
+  const banner=document.getElementById('m-coleccion-banner');
+  document.getElementById('m-coleccion-banner-txt').textContent=`📚 Cargando desde: ${col}`;
+  banner.style.display='flex';
+  document.getElementById('coleccion-picker').style.display='none';
+  toast(`Datos de "${col}" cargados ✓`,'ok');
+  document.getElementById('m-titulo').focus();
+}
+function clearColeccionMode(){
+  _coleccionMode=null;
+  document.getElementById('m-coleccion-banner').style.display='none';
+}
+
 async function addManual(){
   const t=document.getElementById('m-titulo').value.trim();if(!t){toast('El título es obligatorio','err');return;}
   const tipo=document.getElementById('m-tipo').value;
-  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,portada_url:'',descripcion:'',bio_autor:'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
+  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
+  // Reset manual cache
+  window._manualCover='';window._manualDesc='';window._manualBio='';
+  // Si hay modo colección activo, limpiar solo el título para el siguiente libro
+  if(_coleccionMode){
+    document.getElementById('m-titulo').value='';
+    document.getElementById('m-autor').value='';
+    document.getElementById('m-isbn').value='';
+    document.getElementById('m-año').value='';
+    document.getElementById('m-paginas').value='';
+    library.unshift(nb);await saveToDrive();renderLib();toast(`"${nb.titulo}" agregado — seguí cargando la colección`,'ok');openDetail(nb.id);
+    return;
+  }
   library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
 }
 
