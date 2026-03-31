@@ -623,7 +623,10 @@ function pickShelf(prefix,id){
 function saveClientId(){const v=document.getElementById('setup-cid').value.trim();if(!v){toast('Ingresá un Client ID válido','err');return;}localStorage.setItem('lib_cid',v);document.getElementById('setup').classList.remove('show');loadLocal();renderLib();setTimeout(()=>initGIS(v),500);}
 function skipSetup(){localStorage.setItem('lib_cid','__skip__');document.getElementById('setup').classList.remove('show');document.getElementById('off-banner').classList.add('show');loadLocal();renderLib();}
 function loadLocal(){try{library=JSON.parse(localStorage.getItem('lib_data')||'[]');}catch(e){library=[];}}
-function saveLocal(){localStorage.setItem('lib_data',JSON.stringify(library));}
+function saveLocal(){
+  localStorage.setItem('lib_data',JSON.stringify(library));
+  localStorage.setItem('lib_modified',Date.now().toString());
+}
 
 function initGIS(cid){
   if(cid==='__skip__')return;
@@ -717,24 +720,35 @@ async function driveReq(url,method='GET',body=null,hdrs={}){
 async function loadFromDrive(){
   toast('Cargando desde Drive...','info');
   try{
-    const r=await driveReq('https://www.googleapis.com/drive/v3/files?q=name%3D%22biblioteca.json%22+and+trashed%3Dfalse&spaces=drive&fields=files(id)');
+    const r=await driveReq('https://www.googleapis.com/drive/v3/files?q=name%3D%22biblioteca.json%22+and+trashed%3Dfalse&spaces=drive&fields=files(id,modifiedTime)');
     const d=await r.json();
     if(d.files?.length){
       driveFileId=d.files[0].id;
+      const driveModified=new Date(d.files[0].modifiedTime||0).getTime();
+      const localModified=parseInt(localStorage.getItem('lib_modified')||'0');
+      // Si hay cambios locales más nuevos que Drive → no pisar con Drive
+      if(_unsyncedLocal&&localModified>driveModified){
+        toast(`Tus cambios locales son más nuevos — sincronizando con Drive...`,'info');
+        // Subir local a Drive en lugar de bajar Drive
+        await saveToDrive();
+        return;
+      }
       const fr=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
       const driveLib=await fr.json();
-      // Merge: si hay cambios locales sin sync, priorizar local
-      if(_unsyncedLocal&&library.length>driveLib.length){
-        toast(`Manteniendo ${library.length} libros locales (Drive tiene ${driveLib.length})`, 'info');
-      } else {
-        library=driveLib;
-        saveLocal();
-        renderLib();
-      }
+      library=driveLib;
+      saveLocal();
+      renderLib();
       toast(`${library.length} libros cargados ✓`,'ok');
     } else {
-      await createDriveFile();
-      toast('Archivo nuevo creado en Drive','ok');
+      // No existe en Drive — subir lo que tenemos local
+      if(library.length>0){
+        await createDriveFile();
+        await saveToDrive();
+        toast(`Biblioteca subida a Drive (${library.length} libros) ✓`,'ok');
+      } else {
+        await createDriveFile();
+        toast('Archivo nuevo creado en Drive','ok');
+      }
     }
   }catch(e){toast('Error Drive. Usando datos locales.','err');document.getElementById('off-banner').classList.add('show');}
 }
@@ -1157,8 +1171,12 @@ function renderDetail(b){
       <label class="cover-upload-btn">🖼 Cambiar portada<input type="file" accept="image/*" style="display:none" onchange="uploadCover(event,'${b.id}')"></label>
       <button class="cover-upload-btn" style="right:140px" onclick="buscarPortadaDetalle('${b.id}')">🔍 Buscar portada</button>
     </div>
-    <div class="dp-title">${eh(b.titulo||'')}</div>
-    <div class="dp-author">${eh(b.autor||'')}</div>
+    <div class="dp-title">
+      <input type="text" value="${eh(b.titulo||'')}" style="background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);width:100%;outline:none;padding:2px 0;font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:400;line-height:1.2" onchange="updField('titulo',this.value);markUnsaved()" oninput="markUnsaved()">
+    </div>
+    <div class="dp-author">
+      <input type="text" value="${eh(b.autor||'')}" style="background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--accent);width:100%;outline:none;padding:2px 0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('autor',this.value);markUnsaved()" oninput="markUnsaved()">
+    </div>
     <div class="dp-badges">
       ${tipoBadge(b)}
       ${b.coleccion?`<span class="badge badge-coleccion">📚 ${eh(b.coleccion)}</span>`:''}
@@ -1170,12 +1188,12 @@ function renderDetail(b){
       </select>
     </div>
     <div class="dp-meta">
-      <div class="mi"><div class="mk">Año</div><div class="mv">${b.año||'—'}</div></div>
-      <div class="mi"><div class="mk">Páginas</div><div class="mv">${b.paginas||'—'}</div></div>
+      <div class="mi"><div class="mk">Año</div><div class="mv"><input type="number" value="${b.año||''}" placeholder="—" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('año',this.value);markUnsaved()"></div></div>
+      <div class="mi"><div class="mk">Páginas</div><div class="mv"><input type="number" value="${b.paginas||''}" placeholder="—" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('paginas',this.value);markUnsaved()"></div></div>
       <div class="mi"><div class="mk">Ejemplares</div><div class="mv"><input type="number" min="1" value="${b.ejemplares||1}" style="background:transparent;border:none;color:var(--text);width:60px;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('ejemplares',parseInt(this.value)||1);markUnsaved()">${(b.ejemplares||1)>1?'<span style="font-size:11px;color:var(--green);margin-left:4px">🎁 para regalar</span>':''}</div></div>
-      <div class="mi"><div class="mk">Editorial</div><div class="mv">${eh(b.editorial||'—')}</div></div>
-      <div class="mi"><div class="mk">Idioma</div><div class="mv">${eh(b.idioma||'—')}</div></div>
-      ${b.genero?`<div class="mi"><div class="mk">Género</div><div class="mv">${eh(b.genero)}</div></div>`:''}
+      <div class="mi"><div class="mk">Editorial</div><div class="mv"><input type="text" value="${eh(b.editorial||'')}" placeholder="—" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('editorial',this.value);markUnsaved()"></div></div>
+      <div class="mi"><div class="mk">Idioma</div><div class="mv"><input type="text" value="${eh(b.idioma||'')}" placeholder="—" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('idioma',this.value);markUnsaved()"></div></div>
+      <div class="mi"><div class="mk">Género</div><div class="mv"><input type="text" value="${eh(b.genero||'')}" placeholder="—" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('genero',this.value);markUnsaved()"></div></div>
       <div class="mi" style="grid-column:1/-1"><div class="mk">ISBN</div>
         <div class="mv"><input type="text" value="${eh(b.isbn||'')}" placeholder="Sin ISBN"
           style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px"
