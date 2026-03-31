@@ -577,12 +577,23 @@ let pendingChanges=false,confirmCb=null,mergeCb=null,syncPending=[];
 let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null,currentDzTab='files';
 let _mShelf='',_pShelf='';
+let _unsyncedLocal=false; // hay cambios locales sin subir a Drive
+let _driveCheckInterval=null;
+let _tokenExpiry=0; // timestamp cuando expira el token
 
 window.onload=()=>{
   localStorage.setItem('lib_cid',localStorage.getItem('lib_cid')||CLIENT_ID);
   const cid=localStorage.getItem('lib_cid');
   if(!cid){document.getElementById('setup').classList.add('show');return;}
-  loadLocal();renderLib();setTimeout(()=>initGIS(cid),800);
+  loadLocal();renderLib();
+  // Check if there are unsynced local changes
+  _unsyncedLocal=localStorage.getItem('lib_unsynced')==='1';
+  if(_unsyncedLocal)showUnsyncedBanner();
+  setTimeout(()=>{
+    initGIS(cid);
+    // Auto-connect after GIS loads (silent prompt)
+    setTimeout(()=>autoConnectDrive(),1500);
+  },800);
   renderShelfPicker('m-shelf-picker','m');
   renderShelfPicker('prev-shelf-picker','p');
 };
@@ -620,19 +631,83 @@ function initGIS(cid){
     tokenClient=google.accounts.oauth2.initTokenClient({
       client_id:cid,scope:'https://www.googleapis.com/auth/drive.file',
       callback:async(r)=>{
-        if(r.error){toast('Error Drive: '+r.error,'err');return;}
+        if(r.error){
+          if(r.error==='access_denied'||r.error==='user_cancelled'){
+            document.getElementById('off-banner').classList.add('show');
+            return;
+          }
+          toast('Error Drive: '+r.error,'err');return;
+        }
         accessToken=r.access_token;
-        document.getElementById('drive-btn').innerHTML='✅ Drive conectado';
-        document.getElementById('drive-btn').style.color='var(--green)';
-        document.getElementById('user-badge').style.display='flex';
-        document.getElementById('user-name').textContent='☁ Drive';
-        document.getElementById('off-banner').classList.remove('show');
-        document.getElementById('sync-btn').style.display='inline-flex';
-        await loadFromDrive();await ensureEpubFolder();
+        _tokenExpiry=Date.now()+(r.expires_in||3600)*1000-60000; // 1 min antes
+        onDriveConnected();
       }
     });
   }catch(e){console.warn('GIS',e);}
 }
+
+async function onDriveConnected(){
+  document.getElementById('drive-btn').innerHTML='✅ Drive conectado';
+  document.getElementById('drive-btn').style.color='var(--green)';
+  document.getElementById('user-badge').style.display='flex';
+  document.getElementById('user-name').textContent='☁ Drive';
+  document.getElementById('off-banner').classList.remove('show');
+  document.getElementById('sync-btn').style.display='inline-flex';
+  hideUnsyncedBanner();
+  await loadFromDrive();
+  await ensureEpubFolder();
+  // Si había cambios locales sin sincronizar, subirlos
+  if(_unsyncedLocal){
+    toast('Sincronizando cambios locales pendientes...','info');
+    await saveToDrive();
+    _unsyncedLocal=false;
+    localStorage.removeItem('lib_unsynced');
+  }
+  // Iniciar chequeo periódico de token (cada 4 minutos)
+  if(_driveCheckInterval)clearInterval(_driveCheckInterval);
+  _driveCheckInterval=setInterval(checkTokenAndRefresh,4*60*1000);
+}
+
+function autoConnectDrive(){
+  if(!tokenClient||localStorage.getItem('lib_cid')==='__skip__')return;
+  // Intento silencioso (sin popup) usando prompt:'none'
+  try{
+    tokenClient.requestAccessToken({prompt:'none'});
+  }catch(e){
+    // Si falla silencioso, mostrar banner pero no forzar popup
+    document.getElementById('off-banner').classList.add('show');
+  }
+}
+
+async function checkTokenAndRefresh(){
+  if(!tokenClient)return;
+  if(Date.now()>_tokenExpiry){
+    // Token expirado o por expirar → refrescar silenciosamente
+    try{tokenClient.requestAccessToken({prompt:'none'});}
+    catch(e){
+      accessToken=null;
+      document.getElementById('drive-btn').innerHTML='☁ Conectar Drive';
+      document.getElementById('drive-btn').style.color='';
+      document.getElementById('off-banner').classList.add('show');
+      showUnsyncedBanner();
+    }
+  }
+}
+
+function showUnsyncedBanner(){
+  let b=document.getElementById('unsynced-banner');
+  if(!b){
+    b=document.createElement('div');b.id='unsynced-banner';
+    b.style.cssText='position:fixed;bottom:60px;right:18px;z-index:500;background:var(--card);border:1px solid rgba(181,116,58,.4);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--accent);box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:10px;max-width:280px';
+    b.innerHTML='⚠ Cambios sin sincronizar con Drive<button onclick="connectDrive()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;margin-left:4px">Conectar</button>';
+    document.body.appendChild(b);
+  }
+  b.style.display='flex';
+}
+function hideUnsyncedBanner(){
+  const b=document.getElementById('unsynced-banner');if(b)b.style.display='none';
+}
+
 function connectDrive(){if(!tokenClient){toast('Client ID no configurado','err');return;}tokenClient.requestAccessToken();}
 
 async function driveReq(url,method='GET',body=null,hdrs={}){
@@ -644,8 +719,23 @@ async function loadFromDrive(){
   try{
     const r=await driveReq('https://www.googleapis.com/drive/v3/files?q=name%3D%22biblioteca.json%22+and+trashed%3Dfalse&spaces=drive&fields=files(id)');
     const d=await r.json();
-    if(d.files?.length){driveFileId=d.files[0].id;const fr=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);library=await fr.json();saveLocal();renderLib();toast(`${library.length} libros cargados ✓`,'ok');}
-    else{await createDriveFile();toast('Archivo nuevo creado en Drive','ok');}
+    if(d.files?.length){
+      driveFileId=d.files[0].id;
+      const fr=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+      const driveLib=await fr.json();
+      // Merge: si hay cambios locales sin sync, priorizar local
+      if(_unsyncedLocal&&library.length>driveLib.length){
+        toast(`Manteniendo ${library.length} libros locales (Drive tiene ${driveLib.length})`, 'info');
+      } else {
+        library=driveLib;
+        saveLocal();
+        renderLib();
+      }
+      toast(`${library.length} libros cargados ✓`,'ok');
+    } else {
+      await createDriveFile();
+      toast('Archivo nuevo creado en Drive','ok');
+    }
   }catch(e){toast('Error Drive. Usando datos locales.','err');document.getElementById('off-banner').classList.add('show');}
 }
 async function createDriveFile(){
@@ -656,11 +746,38 @@ async function createDriveFile(){
   driveFileId=(await r.json()).id;
 }
 async function saveToDrive(){
-  if(!accessToken||!driveFileId){saveLocal();return;}
-  try{
-    await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,'PATCH',JSON.stringify(library),{'Content-Type':'application/json'});
-    saveLocal();pendingChanges=false;document.getElementById('unsaved-bar').classList.remove('show');toast('Guardado en Drive ✓','ok');
-  }catch(e){saveLocal();toast('Error guardando en Drive','err');}
+  saveLocal(); // siempre guardar local primero
+  if(!accessToken||!driveFileId){
+    // Sin Drive: marcar como pendiente
+    _unsyncedLocal=true;
+    localStorage.setItem('lib_unsynced','1');
+    showUnsyncedBanner();
+    return;
+  }
+  // Intentar subir a Drive con hasta 3 reintentos
+  let attempts=0;
+  while(attempts<3){
+    try{
+      await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,'PATCH',JSON.stringify(library),{'Content-Type':'application/json'});
+      pendingChanges=false;
+      _unsyncedLocal=false;
+      localStorage.removeItem('lib_unsynced');
+      hideUnsyncedBanner();
+      document.getElementById('unsaved-bar').classList.remove('show');
+      toast('Guardado en Drive ✓','ok');
+      return;
+    }catch(e){
+      attempts++;
+      if(attempts<3){
+        await new Promise(r=>setTimeout(r,1500*attempts)); // espera creciente
+      }
+    }
+  }
+  // Fallaron los 3 intentos
+  _unsyncedLocal=true;
+  localStorage.setItem('lib_unsynced','1');
+  showUnsyncedBanner();
+  toast('No se pudo guardar en Drive — guardado localmente','info');
 }
 async function ensureEpubFolder(){
   if(!accessToken)return;
@@ -1467,36 +1584,52 @@ function subirPortadaManual(event){
 
 async function buscarPortadaDetalle(bookId){
   const b=library.find(x=>x.id===bookId);if(!b)return;
-  toast('Buscando portada...','info');
+  const btn=document.querySelector(`button[onclick="buscarPortadaDetalle('${bookId}')"]`);
+  if(btn){btn.textContent='🔍 Buscando...';btn.disabled=true;}
   const covers=[];
-  const isbn=b.isbn?.replace(/[-\s]/g,'')||'';
+  const isbn=(b.isbn||'').replace(/[-\s]/g,'');
   // Open Library por ISBN
-  if(isbn){try{const r=await fetch(`https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`);if(r.ok&&r.headers.get('content-type')?.includes('image'))covers.push(r.url);}catch(e){}}
-  // Open Library por título
-  try{const r=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(b.titulo||'')}&author=${encodeURIComponent(b.autor||'')}&limit=6&fields=cover_i`);const d=await r.json();(d.docs||[]).filter(x=>x.cover_i).forEach(x=>covers.push(`https://covers.openlibrary.org/b/id/${x.cover_i}-L.jpg`));}catch(e){}
-  // Google Books
-  try{const q=isbn?`isbn:${isbn}`:`${b.titulo} ${b.autor}`;const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=6`);const d=await r.json();(d.items||[]).forEach(i=>{const img=i.volumeInfo?.imageLinks;const u=(img?.extraLarge||img?.large||img?.medium||img?.thumbnail||'').replace('http:','https:').replace('zoom=1','zoom=3');if(u)covers.push(u);});}catch(e){}
-  if(!covers.length){toast('No se encontró portada — subila con "🖼 Cambiar portada"','info');return;}
-  // Show picker modal
-  let idx=0;
-  const showCover=()=>{
-    b.portada_url=covers[idx];
-    const coverImg=document.querySelector('#dp-cover-wrap img');
-    if(coverImg){coverImg.src=covers[idx];coverImg.style.display='block';}
-    else{renderDetail(b);}
-    toast(`Portada ${idx+1}/${covers.length} — guardá si te gusta`,'info');
-  };
-  showCover();
-  // Add "siguiente" button temporarily
-  const existingNext=document.getElementById('dp-next-cover');if(existingNext)existingNext.remove();
-  if(covers.length>1){
-    const btn=document.createElement('button');btn.id='dp-next-cover';
-    btn.className='cover-upload-btn';btn.style.cssText='right:260px';
-    btn.textContent='↻ Siguiente';
-    btn.onclick=()=>{idx=(idx+1)%covers.length;showCover();markUnsaved();};
-    document.querySelector('#dp-cover-wrap').appendChild(btn);
+  if(isbn){try{const r=await fetch(`https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`);if(r.ok&&r.url&&!r.url.includes('default'))covers.push({url:r.url,src:'Open Library (ISBN)'});}catch(e){}}
+  // Open Library por título+autor
+  try{const r=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(b.titulo||'')}&author=${encodeURIComponent(b.autor||'')}&limit=8&fields=cover_i,title`);const d=await r.json();(d.docs||[]).filter(x=>x.cover_i).forEach(x=>covers.push({url:`https://covers.openlibrary.org/b/id/${x.cover_i}-L.jpg`,src:`Open Library: ${x.title||b.titulo}`}));}catch(e){}
+  // Google Books por ISBN y por título
+  for(const q of [isbn?`isbn:${isbn}`:null,`${b.titulo} ${b.autor}`].filter(Boolean)){
+    try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5`);const d=await r.json();(d.items||[]).forEach(i=>{const img=i.volumeInfo?.imageLinks;const u=(img?.extraLarge||img?.large||img?.medium||img?.thumbnail||'').replace('http:','https:').replace('zoom=1','zoom=3');if(u)covers.push({url:u,src:`Google Books: ${i.volumeInfo?.title||b.titulo}`});});}catch(e){}
   }
-  markUnsaved();
+  if(btn){btn.textContent='🔍 Buscar portada';btn.disabled=false;}
+  if(!covers.length){toast('No se encontró ninguna portada — usá "🖼 Cambiar portada" para subir una','info');return;}
+  // Remove existing picker if any
+  document.getElementById('dp-cover-picker')?.remove();
+  // Build picker UI below the cover
+  let idx=0;
+  const picker=document.createElement('div');
+  picker.id='dp-cover-picker';
+  picker.style.cssText='background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:0 0 14px;display:flex;gap:12px;align-items:center';
+  const previewImg=document.createElement('img');
+  previewImg.style.cssText='width:60px;height:90px;object-fit:cover;border-radius:5px;box-shadow:var(--shadow);flex-shrink:0';
+  previewImg.src=covers[0].url;
+  const info=document.createElement('div');info.style.flex='1';
+  const srcLbl=document.createElement('div');srcLbl.style.cssText='font-size:11px;color:var(--text3);margin-bottom:6px';
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+  const updatePicker=()=>{
+    previewImg.src=covers[idx].url;
+    srcLbl.textContent=`${covers[idx].src} (${idx+1}/${covers.length})`;
+  };
+  updatePicker();
+  const btnUsar=document.createElement('button');btnUsar.className='btn btn-accent btn-sm';btnUsar.textContent='✓ Usar esta';
+  btnUsar.onclick=async()=>{b.portada_url=covers[idx].url;picker.remove();const ci=document.querySelector('#dp-cover-wrap img');if(ci)ci.src=b.portada_url;else renderDetail(b);await saveToDrive();renderLib();toast('Portada actualizada ✓','ok');};
+  const btnNext=document.createElement('button');btnNext.className='btn btn-ghost btn-sm';btnNext.textContent='↻ Siguiente';
+  btnNext.onclick=()=>{idx=(idx+1)%covers.length;updatePicker();};
+  const btnCancel=document.createElement('button');btnCancel.className='btn btn-ghost btn-sm';btnCancel.textContent='✕ Cancelar';
+  btnCancel.onclick=()=>picker.remove();
+  if(covers.length<=1)btnNext.style.display='none';
+  actions.append(btnUsar,btnNext,btnCancel);
+  info.append(srcLbl,actions);
+  picker.append(previewImg,info);
+  // Insert after cover wrap
+  const coverWrap=document.getElementById('dp-cover-wrap');
+  coverWrap?.parentNode?.insertBefore(picker,coverWrap.nextSibling);
+  toast(`${covers.length} portada${covers.length!==1?'s':''} encontrada${covers.length!==1?'s':''}. Elegí cuál usar.`,'info');
 }
 
 async function buscarMasInfo(){
