@@ -63,8 +63,8 @@ select option{background:var(--card)}
 .bc-ph .bc-ph-author{font-size:8px;color:rgba(255,255,255,0.75);margin-top:3px;text-align:left;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bc-ph .bc-ph-line{width:20px;height:2px;background:rgba(255,255,255,0.5);margin-bottom:5px;flex-shrink:0}
 .bk-info{padding:8px 2px 0}
-.bk-title{font-family:'Cormorant Garamond',serif;font-size:14px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.bk-author{font-size:11px;color:var(--text3);margin-top:2px}
+.bk-title{font-family:'Cormorant Garamond',serif;font-size:16px;line-height:1.3;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-author{font-size:13px;color:var(--text3);margin-top:2px}
 .bk-badges{display:flex;gap:3px;margin-top:5px;flex-wrap:wrap}
 .badge{font-size:10px;padding:2px 7px;border-radius:9px;font-weight:500}
 .badge-fisico{background:rgba(37,99,168,.1);color:var(--blue)}
@@ -193,7 +193,7 @@ select option{background:var(--card)}
 .autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:var(--shadow-lg);z-index:300;max-height:160px;overflow-y:auto;display:none}
 .autocomplete-list.show{display:block}
 .autocomplete-item{padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);transition:background .12s}
-.autocomplete-item:hover{background:var(--accent-dim);color:var(--accent)}
+.autocomplete-item:hover,.autocomplete-item.ac-active{background:var(--accent-dim);color:var(--accent)}
 .drop-zone{border:2px dashed var(--border2);border-radius:12px;padding:28px 20px;text-align:center;transition:all .2s;cursor:pointer;margin-bottom:12px}
 .drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:var(--accent-dim)}
 .dz-icon{font-size:34px;margin-bottom:7px;transition:transform .2s;display:block}
@@ -425,7 +425,7 @@ select option{background:var(--card)}
 
       <div id="tc-search">
         <div class="fr"><label class="fl">Título, autor o ISBN</label><input type="text" id="modal-q" placeholder="Ej: Cien años de soledad, Borges..." oninput="debBookSearch()"></div>
-        <div id="s-loading" style="display:none;text-align:center;padding:16px"><div class="spin"></div></div>
+        <div id="s-loading" style="display:none;text-align:center;padding:16px"><div class="spin" style="margin:0 auto 8px"></div><p style="color:var(--text3);font-size:12px">Buscando en Open Library y Google Books...</p></div>
         <div id="s-results-wrap" style="display:none"><div class="fl" style="margin-bottom:6px">Resultados</div><div id="s-results" class="srl"></div></div>
       </div>
 
@@ -506,11 +506,15 @@ select option{background:var(--card)}
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <button class="btn btn-ghost" style="flex:1" onclick="buscarMasInfo()">🔍 Buscar info online</button>
-          <button class="btn btn-ghost" style="flex:1" onclick="buscarPortadaManual()">🖼 Buscar portada</button>
-          <button class="btn btn-accent" style="flex:1" onclick="addManual()">✅ Agregar</button>
+        <div class="fr"><label class="fl">Mis comentarios / Contenido</label>
+          <textarea id="m-comentarios" rows="2" placeholder="Ej: Contiene Ficciones y El Aleph..." style="resize:vertical"></textarea>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+          <button class="btn btn-ghost btn-sm" onclick="buscarMasInfo()">🔍 Buscar datos</button>
+          <button class="btn btn-ghost btn-sm" onclick="buscarPortadaManual()">🖼 Buscar portada</button>
+          <button class="btn btn-ghost btn-sm" onclick="buscarBioManual()">👤 Buscar bio</button>
+        </div>
+        <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="addManual()">✅ Agregar</button>
         <!-- Cover preview -->
         <div id="m-cover-wrap" style="display:none;margin-top:10px;display:none;align-items:center;gap:12px;background:var(--bg);border-radius:8px;padding:10px;border:1px solid var(--border)">
           <img id="m-cover-preview" style="width:50px;height:75px;object-fit:cover;border-radius:4px;box-shadow:var(--shadow)">
@@ -1212,10 +1216,13 @@ function renderDetail(b){
     <div class="ds"><div class="dst">📑 ÍNDICE <button onclick="addToc()">+ Capítulo</button></div>
       <div style="overflow-x:auto"><table class="toc-tbl"><thead><tr><th>#</th><th>Título</th><th>Pág</th><th></th></tr></thead><tbody>${toc}</tbody></table></div>
     </div>
-    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-danger btn-sm" onclick="deleteBook('${b.id}')">🗑 Eliminar</button>
-      ${b.tipo!=='ambos'?`<button class="btn btn-ghost btn-sm" onclick="promptAddOtherFormat('${b.id}')">➕ Agregar ${b.tipo==='fisico'?'versión digital':'versión física'}</button>`:''}
-      <button class="btn btn-ghost btn-sm" onclick="rebuscarMetadatos('${b.id}')">🔄 Rebuscar metadatos</button>
+      ${b.tipo!=='ambos'?`<button class="btn btn-ghost btn-sm" onclick="promptAddOtherFormat('${b.id}')">➕ ${b.tipo==='fisico'?'+ digital':'+ físico'}</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="buscarPortadaDetalle('${b.id}')">🖼 Portada</button>
+      <button class="btn btn-ghost btn-sm" onclick="buscarDescDetalle('${b.id}')">📝 Descripción</button>
+      <button class="btn btn-ghost btn-sm" onclick="buscarBioDetalle('${b.id}')">👤 Bio autor</button>
+      <button class="btn btn-ghost btn-sm" onclick="rebuscarMetadatos('${b.id}')">🔄 Todo</button>
     </div>`;
 }
 
@@ -1385,7 +1392,6 @@ function getLibraryValues(field){
 }
 function setupAutocomplete(inputId,field){
   const input=document.getElementById(inputId);if(!input)return;
-  // Wrap in autocomplete-wrap if not already
   if(!input.parentElement.classList.contains('autocomplete-wrap')){
     const wrap=document.createElement('div');wrap.className='autocomplete-wrap';
     input.parentNode.insertBefore(wrap,input);wrap.appendChild(input);
@@ -1393,14 +1399,35 @@ function setupAutocomplete(inputId,field){
     wrap.appendChild(list);
   }
   const list=document.getElementById(inputId+'-ac');if(!list)return;
+  let acIdx=-1;
+  const getItems=()=>list.querySelectorAll('.autocomplete-item');
+  const highlight=(idx)=>{
+    getItems().forEach((el,i)=>el.classList.toggle('ac-active',i===idx));
+    const active=list.querySelector('.ac-active');
+    if(active)active.scrollIntoView({block:'nearest'});
+  };
+  const confirm=(idx)=>{
+    const items=getItems();
+    const val=items[idx]?.textContent;
+    if(val){input.value=val;list.classList.remove('show');acIdx=-1;input.dispatchEvent(new Event('change'));}
+  };
   input.addEventListener('input',()=>{
+    acIdx=-1;
     const q=(input.value||'').toLowerCase();
     const vals=getLibraryValues(field).filter(v=>v.toLowerCase().includes(q)&&v.toLowerCase()!==q);
     if(!q||!vals.length){list.classList.remove('show');return;}
-    list.innerHTML=vals.slice(0,8).map(v=>`<div class="autocomplete-item" onmousedown="event.preventDefault();document.getElementById('${inputId}').value='${eh(v)}';document.getElementById('${inputId}-ac').classList.remove('show')">${eh(v)}</div>`).join('');
+    list.innerHTML=vals.slice(0,8).map(v=>`<div class="autocomplete-item" onmousedown="event.preventDefault();document.getElementById('${inputId}').value='${eh(v)}';document.getElementById('${inputId}-ac').classList.remove('show');document.getElementById('${inputId}').dispatchEvent(new Event('change'))">${eh(v)}</div>`).join('');
     list.classList.add('show');
   });
-  input.addEventListener('blur',()=>setTimeout(()=>list.classList.remove('show'),150));
+  input.addEventListener('keydown',(e)=>{
+    if(!list.classList.contains('show'))return;
+    const items=getItems();
+    if(e.key==='ArrowDown'){e.preventDefault();acIdx=Math.min(acIdx+1,items.length-1);highlight(acIdx);}
+    else if(e.key==='ArrowUp'){e.preventDefault();acIdx=Math.max(acIdx-1,-1);highlight(acIdx);if(acIdx===-1)getItems().forEach(el=>el.classList.remove('ac-active'));}
+    else if(e.key==='Enter'||e.key==='Tab'){if(acIdx>=0){e.preventDefault();confirm(acIdx);}else{list.classList.remove('show');}}
+    else if(e.key==='Escape'){list.classList.remove('show');acIdx=-1;}
+  });
+  input.addEventListener('blur',()=>setTimeout(()=>{list.classList.remove('show');acIdx=-1;},150));
 }
 function initAutocompletes(){
   setupAutocomplete('m-autor','autor');
@@ -1448,7 +1475,7 @@ function openAdd(){
   if(camRes){camRes.style.display='none';document.getElementById('cam-results').innerHTML='';}
   stopCam();
   // Reset manual form completo
-  ['m-titulo','m-autor','m-isbn','m-año','m-editorial','m-genero','m-paginas','m-coleccion'].forEach(id=>{
+  ['m-titulo','m-autor','m-isbn','m-año','m-editorial','m-genero','m-paginas','m-coleccion','m-comentarios'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
   document.getElementById('m-idioma').value='Español';
@@ -1650,6 +1677,89 @@ async function buscarPortadaDetalle(bookId){
   toast(`${covers.length} portada${covers.length!==1?'s':''} encontrada${covers.length!==1?'s':''}. Elegí cuál usar.`,'info');
 }
 
+async function buscarBioManual(){
+  const autor=document.getElementById('m-autor').value.trim();
+  if(!autor){toast('Ingresá el autor primero','err');return;}
+  toast('Buscando biografía...','info');
+  let bio='';
+  try{
+    const wikiR=await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(autor)}`);
+    if(wikiR.ok){const d=await wikiR.json();if(d.extract&&d.extract.length>50&&d.type!=='disambiguation')bio=d.extract;}
+  }catch(e){}
+  if(!bio){
+    // Fallback Open Library
+    try{
+      const titulo=document.getElementById('m-titulo').value.trim();
+      const res=await fetchBooks(titulo+' '+autor);
+      if(res[0]?.olKey){
+        const wr=await fetch(`https://openlibrary.org${res[0].olKey}.json`);
+        const wd=await wr.json();
+        if(wd.authors?.length){
+          const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);
+          const ad=await ar.json();
+          if(ad.bio)bio=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';
+        }
+      }
+    }catch(e){}
+  }
+  if(bio){window._manualBio=bio;toast('Biografía encontrada ✓','ok');}
+  else toast('No se encontró biografía para este autor','info');
+}
+
+async function buscarDescManual(){
+  const titulo=document.getElementById('m-titulo').value.trim();
+  const autor=document.getElementById('m-autor').value.trim();
+  if(!titulo){toast('Ingresá el título primero','err');return;}
+  toast('Buscando descripción...','info');
+  let desc='';
+  try{
+    const q=`intitle:${titulo}${autor?' inauthor:'+autor:''}`;
+    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);
+    const d=await r.json();
+    const best=(d.items||[]).find(i=>similarityScore(i.volumeInfo?.title||'',titulo)>0.5&&i.volumeInfo?.description);
+    if(best)desc=best.volumeInfo.description;
+  }catch(e){}
+  if(!desc){
+    try{
+      const res=await fetchBooks(titulo+' '+autor);
+      if(res[0]?.olKey){
+        const wr=await fetch(`https://openlibrary.org${res[0].olKey}.json`);
+        const wd=await wr.json();
+        if(wd.description)desc=typeof wd.description==='string'?wd.description:wd.description.value||'';
+      }
+    }catch(e){}
+  }
+  if(desc){window._manualDesc=desc;toast('Descripción encontrada ✓','ok');}
+  else toast('No se encontró descripción','info');
+}
+
+async function buscarBioDetalle(bookId){
+  const b=library.find(x=>x.id===bookId);if(!b)return;
+  toast('Buscando biografía...','info');
+  let bio='';
+  try{
+    const wikiR=await fetch(`https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(b.autor||'')}`);
+    if(wikiR.ok){const d=await wikiR.json();if(d.extract&&d.extract.length>50&&d.type!=='disambiguation')bio=d.extract;}
+  }catch(e){}
+  if(bio){b.bio_autor=bio;await saveToDrive();renderDetail(b);toast('Biografía actualizada ✓','ok');}
+  else toast('No se encontró biografía','info');
+}
+
+async function buscarDescDetalle(bookId){
+  const b=library.find(x=>x.id===bookId);if(!b)return;
+  toast('Buscando descripción...','info');
+  let desc='';
+  try{
+    const q=`intitle:${b.titulo}${b.autor?' inauthor:'+b.autor:''}`;
+    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);
+    const d=await r.json();
+    const best=(d.items||[]).find(i=>similarityScore(i.volumeInfo?.title||'',b.titulo)>0.5&&i.volumeInfo?.description);
+    if(best)desc=best.volumeInfo.description;
+  }catch(e){}
+  if(desc){b.descripcion=desc;await saveToDrive();renderDetail(b);toast('Descripción actualizada ✓','ok');}
+  else toast('No se encontró descripción','info');
+}
+
 async function buscarMasInfo(){
   const titulo=document.getElementById('m-titulo').value.trim();
   const autor=document.getElementById('m-autor').value.trim();
@@ -1729,7 +1839,7 @@ function clearColeccionMode(){
 async function addManual(){
   const t=document.getElementById('m-titulo').value.trim();if(!t){toast('El título es obligatorio','err');return;}
   const tipo=document.getElementById('m-tipo').value;
-  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
+  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:document.getElementById('m-comentarios')?.value.trim()||'',estado:'pendiente'};
   // Reset manual cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
   // Si hay modo colección activo, limpiar solo el título para el siguiente libro
