@@ -1842,14 +1842,17 @@ async function addManual(){
   const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:document.getElementById('m-comentarios')?.value.trim()||'',estado:'pendiente'};
   // Reset manual cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
-  // Si hay modo colección activo, limpiar solo el título para el siguiente libro
+  // Si hay modo colección activo, limpiar solo lo necesario para el siguiente libro
   if(_coleccionMode){
     document.getElementById('m-titulo').value='';
-    document.getElementById('m-autor').value='';
+    // autor se mantiene
     document.getElementById('m-isbn').value='';
     document.getElementById('m-año').value='';
     document.getElementById('m-paginas').value='';
+    document.getElementById('m-comentarios').value=''; // limpiar descripción/contenido
+    document.getElementById('m-ejemplares').value='1'; // volver a 1
     library.unshift(nb);await saveToDrive();renderLib();toast(`"${nb.titulo}" agregado — seguí cargando la colección`,'ok');openDetail(nb.id);
+    document.getElementById('m-titulo').focus();
     return;
   }
   library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
