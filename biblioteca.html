@@ -288,6 +288,20 @@ select option{background:var(--card)}
 
 <div id="confirm"><div class="cc"><div class="cc-t">¿Eliminar libro?</div><p class="cc-s" id="confirm-txt"></p><div class="cc-a"><button class="btn btn-ghost" onclick="closeConfirm()">Cancelar</button><button class="btn btn-danger" onclick="doConfirm()">Eliminar</button></div></div></div>
 
+<!-- MOVE MODAL -->
+<div id="move-modal" style="display:none;position:fixed;inset:0;z-index:350;background:rgba(44,35,24,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:14px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px;max-width:500px;width:100%;box-shadow:var(--shadow-lg);max-height:80vh;overflow-y:auto">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:21px;margin-bottom:6px" id="move-modal-title">Mover estante</div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px" id="move-modal-sub"></p>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Estante destino</div>
+    <div id="move-shelf-picker" style="margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-accent" onclick="doMove()">📦 Mover</button>
+      <button class="btn btn-ghost" onclick="closeMove()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="merge-modal">
   <div class="merge-card">
     <div class="merge-title">📖 + 💻 Mismo libro encontrado</div>
@@ -383,6 +397,12 @@ select option{background:var(--card)}
       <div class="sb-title">Exportar</div>
       <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px" onclick="exportPDF()">📄 Exportar PDF</button>
       <button class="btn btn-ghost btn-sm" style="width:100%" onclick="exportJSON()">💾 Exportar JSON</button>
+    </div>
+    <div class="divider"></div>
+    <div class="sb-section">
+      <div class="sb-title">Organizar</div>
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px" onclick="openMoveShelf()">📦 Mover estante</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="openMoveColeccion()">📚 Mover colección</button>
     </div>
   </div>
 
@@ -1572,6 +1592,12 @@ async function searchEpub(titulo,autor){
 async function addSelected(){
   if(!selBookData)return;
   const tipo=document.getElementById('prev-tipo').value;
+  if(tipo==='fisico'&&!_pShelf){
+    toast('Asigná un estante antes de agregar el libro físico','err');
+    // Scroll to shelf picker
+    document.getElementById('prev-shelf-picker')?.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   const nb={id:crypto.randomUUID(),tipo,titulo:selBookData.titulo||'',autor:selBookData.autor||'',isbn:selBookData.isbn||'',año:selBookData.año||'',editorial:selBookData.editorial||'',idioma:selBookData.idioma||'',genero:selBookData.genero||'',paginas:selBookData.paginas||'',portada_url:selBookData.cover||'',descripcion:selBookData.descripcion||'',bio_autor:selBookData.bio_autor||'',indice:selBookData.indice||[],epub_url:selBookData.epub_url||'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_pShelf:'',coleccion:tipo==='fisico'?document.getElementById('prev-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:'',estado:'pendiente'};
   const existing=checkForDuplicate(nb);
   if(existing){showMergePrompt(existing,nb,async()=>{await saveToDrive();renderLib();closeAdd();toast('Unificados ✓','ok');openDetail(existing.id);},async()=>{library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);});}
@@ -1839,6 +1865,11 @@ function clearColeccionMode(){
 async function addManual(){
   const t=document.getElementById('m-titulo').value.trim();if(!t){toast('El título es obligatorio','err');return;}
   const tipo=document.getElementById('m-tipo').value;
+  if(tipo==='fisico'&&!_mShelf){
+    toast('Asigná un estante antes de agregar el libro físico','err');
+    document.getElementById('m-shelf-picker')?.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:document.getElementById('m-comentarios')?.value.trim()||'',estado:'pendiente'};
   // Reset manual cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
@@ -2023,6 +2054,85 @@ function unzip(arr){const files={};let i=0;while(i<arr.length-4){if(arr[i]===0x5
 
 function debSearch(){clearTimeout(searchDT);searchDT=setTimeout(applyFilters,300);}
 function clearFilters(){['f-tipo','f-estado','f-estante','f-genero','f-formato','f-sort','f-coleccion','f-ejemplares'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-sort'?'fecha':'';});document.getElementById('search-input').value='';applyFilters();}
+let _moveMode=null; // {type:'shelf'|'coleccion', value:string}
+let _moveDestShelf='';
+
+function renderMoveShelfPicker(){
+  const el=document.getElementById('move-shelf-picker');if(!el)return;
+  let html='';
+  Object.entries(SHELF_STRUCTURE).forEach(([room,cols])=>{
+    html+=`<div class="shelf-picker-room"><div class="shelf-picker-room-label">${room}</div>`;
+    Object.entries(cols).forEach(([col,ids])=>{
+      html+=`<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px">`;
+      ids.forEach(id=>{
+        const isDouble=DOUBLE_SHELVES.includes(id);
+        html+=`<button class="sp-btn${isDouble?' sp-btn-double':''}" id="mvspb-${id}" onclick="pickMoveShelf('${id}')">${id}</button>`;
+      });
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  });
+  el.innerHTML=html;
+}
+
+function pickMoveShelf(id){
+  _moveDestShelf=id;
+  document.querySelectorAll('[id^="mvspb-"]').forEach(b=>b.classList.toggle('selected',b.id===`mvspb-${id}`));
+}
+
+function openMoveShelf(){
+  // Elegir estante origen
+  const shelves=[...new Set(library.filter(b=>(b.tipo==='fisico'||b.tipo==='ambos')&&b.estante).map(b=>b.estante))].sort((a,b)=>allShelfIds().indexOf(a)-allShelfIds().indexOf(b));
+  if(!shelves.length){toast('No hay libros físicos con estante asignado','info');return;}
+  const origen=prompt('Estante a mover (ej: A3):\nEstantes con libros: '+shelves.join(', '));
+  if(!origen)return;
+  const origenUp=origen.toUpperCase();
+  const libros=library.filter(b=>b.estante===origenUp&&(b.tipo==='fisico'||b.tipo==='ambos'));
+  if(!libros.length){toast(`No hay libros en el estante ${origenUp}`,'err');return;}
+  _moveMode={type:'shelf',value:origenUp};
+  _moveDestShelf='';
+  document.getElementById('move-modal-title').textContent=`Mover estante ${origenUp}`;
+  document.getElementById('move-modal-sub').textContent=`${libros.length} libro${libros.length!==1?'s':''}: ${libros.slice(0,3).map(b=>b.titulo).join(', ')}${libros.length>3?'...':''}`;
+  renderMoveShelfPicker();
+  document.getElementById('move-modal').style.display='flex';
+}
+
+function openMoveColeccion(){
+  const cols=[...new Set(library.filter(b=>b.coleccion&&(b.tipo==='fisico'||b.tipo==='ambos')).map(b=>b.coleccion))].sort();
+  if(!cols.length){toast('No hay colecciones de libros físicos','info');return;}
+  const col=prompt('Colección a mover:\n'+cols.map((c,i)=>`${i+1}. ${c}`).join('\n')+'\n\nEscribí el nombre exacto:');
+  if(!col)return;
+  const libros=library.filter(b=>b.coleccion===col&&(b.tipo==='fisico'||b.tipo==='ambos'));
+  if(!libros.length){toast(`No se encontró la colección "${col}"`,'err');return;}
+  // Mostrar estantes actuales de la colección
+  const estandesActuales=[...new Set(libros.map(b=>b.estante).filter(Boolean))].join(', ');
+  _moveMode={type:'coleccion',value:col};
+  _moveDestShelf='';
+  document.getElementById('move-modal-title').textContent=`Mover colección "${col}"`;
+  document.getElementById('move-modal-sub').textContent=`${libros.length} libro${libros.length!==1?'s':''}${estandesActuales?' · Actualmente en: '+estandesActuales:''}`;
+  renderMoveShelfPicker();
+  document.getElementById('move-modal').style.display='flex';
+}
+
+async function doMove(){
+  if(!_moveDestShelf){toast('Elegí el estante destino','err');return;}
+  if(!_moveMode)return;
+  let count=0;
+  if(_moveMode.type==='shelf'){
+    library.filter(b=>b.estante===_moveMode.value&&(b.tipo==='fisico'||b.tipo==='ambos')).forEach(b=>{b.estante=_moveDestShelf;count++;});
+    toast(`${count} libro${count!==1?'s':''} movidos de ${_moveMode.value} a ${_moveDestShelf} ✓`,'ok');
+  } else {
+    library.filter(b=>b.coleccion===_moveMode.value&&(b.tipo==='fisico'||b.tipo==='ambos')).forEach(b=>{b.estante=_moveDestShelf;count++;});
+    toast(`${count} libro${count!==1?'s':''} de "${_moveMode.value}" movidos a ${_moveDestShelf} ✓`,'ok');
+  }
+  await saveToDrive();renderLib();closeMove();
+}
+
+function closeMove(){
+  document.getElementById('move-modal').style.display='none';
+  _moveMode=null;_moveDestShelf='';
+}
+
 function exportJSON(){const b=new Blob([JSON.stringify(library,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='biblioteca.json';a.click();}
 function importJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{library=JSON.parse(ev.target.result);await saveToDrive();renderLib();toast(`${library.length} libros importados`,'ok');}catch(err){toast('Error al importar','err');}};r.readAsText(f);}
 function toast(msg,type='info'){const el=document.createElement('div');const icons={ok:'✓',err:'✕',info:'ℹ'};el.className=`toast t-${type}`;el.innerHTML=`${icons[type]||'ℹ'} ${eh(msg)}`;document.getElementById('toasts').appendChild(el);setTimeout(()=>el.remove(),3500);}
