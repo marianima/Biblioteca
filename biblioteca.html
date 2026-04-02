@@ -608,6 +608,24 @@ let _driveCheckInterval=null;
 let _tokenExpiry=0; // timestamp cuando expira el token
 
 window.onload=()=>{
+  // Atajos de teclado globales
+  document.addEventListener('keydown',e=>{
+    // Cmd+N (Mac) o Ctrl+N → Agregar libro
+    if((e.metaKey||e.ctrlKey)&&e.key==='n'){
+      e.preventDefault();
+      const modal=document.getElementById('add-modal');
+      if(!modal.classList.contains('open'))openAdd();
+    }
+    // Escape → cerrar modales abiertos
+    if(e.key==='Escape'){
+      if(document.getElementById('add-modal').classList.contains('open'))closeAdd();
+      else if(document.getElementById('detail-panel').classList.contains('open'))closeDetail();
+    }
+    // Cmd+S → guardar cambios en detalle
+    if((e.metaKey||e.ctrlKey)&&e.key==='s'&&document.getElementById('detail-panel').classList.contains('open')){
+      e.preventDefault();saveCurrent();
+    }
+  });
   localStorage.setItem('lib_cid',localStorage.getItem('lib_cid')||CLIENT_ID);
   const cid=localStorage.getItem('lib_cid');
   if(!cid){document.getElementById('setup').classList.add('show');return;}
@@ -1549,6 +1567,8 @@ function openAdd(){
   window._manualCover='';window._manualDesc='';window._manualBio='';
   _coleccionMode=null;_coverResults=[];_coverIdx=0;
   const cw=document.getElementById('m-cover-wrap');if(cw)cw.style.display='none';
+  // Foco automático en el título
+  setTimeout(()=>{const t=document.getElementById('m-titulo');if(t)t.focus();},100);
 }
 function closeAdd(){document.getElementById('add-modal').classList.remove('open');stopCam();window._pendingMergeId=null;}
 function switchTab(t){
