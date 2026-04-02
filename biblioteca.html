@@ -457,17 +457,17 @@ select option{background:var(--card)}
         </div>
         <!-- Campos principales — buscan automáticamente -->
         <div class="fg">
-          <div class="fr"><label class="fl">Título *</label><input type="text" id="m-titulo" oninput="debBookSearch()"></div>
-          <div class="fr"><label class="fl">Autor</label><input type="text" id="m-autor" oninput="debBookSearch()"></div>
-          <div class="fr"><label class="fl">ISBN</label><input type="text" id="m-isbn" placeholder="9789875780620" oninput="debBookSearch()"></div>
-          <div class="fr"><label class="fl">Editorial</label><input type="text" id="m-editorial" oninput="debBookSearch()"></div>
+          <div class="fr"><label class="fl">Título *</label><input type="text" id="m-titulo"></div>
+          <div class="fr"><label class="fl">Autor</label><input type="text" id="m-autor"></div>
+          <div class="fr"><label class="fl">ISBN</label><input type="text" id="m-isbn" placeholder="9789875780620"></div>
+          <div class="fr"><label class="fl">Editorial</label><input type="text" id="m-editorial"></div>
           <div class="fr"><label class="fl">Año</label><input type="number" id="m-año"></div>
           <div class="fr"><label class="fl">Idioma</label><input type="text" id="m-idioma" value="Español"></div>
           <div class="fr"><label class="fl">Género</label><input type="text" id="m-genero"></div>
           <div class="fr"><label class="fl">Páginas</label><input type="number" id="m-paginas"></div>
           <div class="fr"><label class="fl">Ejemplares</label><input type="number" id="m-ejemplares" value="1" min="1"></div>
         </div>
-        <!-- Foto opcional -->
+        <button class="btn btn-accent" style="width:100%;margin-bottom:10px" onclick="searchBooks()">🔍 Buscar</button>
         <div style="margin-bottom:8px;display:flex;gap:7px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-ghost btn-sm" onclick="startCam()" id="btn-start-cam">📷 Cámara</button>
           <button class="btn btn-ghost btn-sm" onclick="captureCam()" id="btn-cap" style="display:none">⊙ Capturar</button>
@@ -1939,7 +1939,7 @@ async function addManual(){
 
 async function startCam(){try{mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('cam-video');v.srcObject=mediaStream;v.style.display='block';document.getElementById('btn-start-cam').style.display='none';document.getElementById('btn-cap').style.display='inline-flex';}catch(e){toast('No se pudo acceder a la cámara','err');}}
 function captureCam(){const v=document.getElementById('cam-video'),c=document.getElementById('cam-canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);const p=document.getElementById('cam-photo');p.src=c.toDataURL('image/jpeg');p.style.display='block';stopCam();v.style.display='none';document.getElementById('cam-isbn-row').style.display='block';document.getElementById('cam-q').focus();}
-function loadPhotoFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const p=document.getElementById('cam-photo');p.src=ev.target.result;p.style.display='block';};r.readAsDataURL(f);debBookSearch();}
+function loadPhotoFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const p=document.getElementById('cam-photo');p.src=ev.target.result;p.style.display='block';toast('Foto cargada — completá los datos y buscá','info');};r.readAsDataURL(f);}
 async function searchFromCam(){const q=document.getElementById('cam-q').value.trim();if(!q){toast('Ingresá un título o ISBN','err');return;}toast('Buscando...','info');_cRes=await fetchBooks(q);if(!_cRes.length){toast('Sin resultados','err');return;}document.getElementById('cam-results').innerHTML=_cRes.map((b,i)=>srHTML(b,i,'c')).join('');document.getElementById('cam-results-wrap').style.display='block';}
 function stopCam(){if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}const v=document.getElementById('cam-video');if(v){v.style.display='none';v.srcObject=null;}const bc=document.getElementById('btn-cap'),bs=document.getElementById('btn-start-cam');if(bc)bc.style.display='none';if(bs)bs.style.display='inline-flex';}
 
