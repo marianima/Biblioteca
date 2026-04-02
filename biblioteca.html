@@ -1394,7 +1394,7 @@ async function rebuscarMetadatos(id) {
     // PASO 3: Descripción en español via Google Books
     try {
       const qg = `intitle:${encodeURIComponent(titulo)}${autor?' inauthor:'+encodeURIComponent(autor):''}`;
-      const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${qg}&langRestrict=es&maxResults=5`);
+      const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${qg}&langRestrict=es&maxResults=8`);
       const d = await r.json();
       const best = (d.items||[]).find(i => similarityScore(i.volumeInfo?.title||'', titulo) > 0.55);
       if (best?.volumeInfo?.description) b.descripcion = best.volumeInfo.description;
@@ -1638,8 +1638,8 @@ async function searchBooks(){
   const autor=(document.getElementById('m-autor')?.value||'').trim();
   const isbn=(document.getElementById('m-isbn')?.value||'').trim();
   const editorial=(document.getElementById('m-editorial')?.value||'').trim();
-  const q=isbn||[titulo,autor].filter(Boolean).join(' ');
-  if(q.length<2){document.getElementById('s-results-wrap').style.display='none';return;}
+
+  if(!titulo&&!autor&&!isbn){document.getElementById('s-results-wrap').style.display='none';return;}
 
   document.getElementById('s-loading').style.display='block';
   const pEl=document.getElementById('s-loading').querySelector('p');
@@ -1662,49 +1662,66 @@ async function searchBooks(){
     document.getElementById('s-results-wrap').style.display='block';
   };
 
+  const OL_FIELDS='key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject';
   const parseOL=(b)=>({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year||'',isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});
   const parseGB=(item)=>{const info=item.volumeInfo||{};return{titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'};};
 
-  const cleanQ=q.replace(/[-\s]/g,'');
+  const cleanQ=(isbn||'').replace(/[-\s]/g,'');
   const isISBN=/^\d{10,13}$/.test(cleanQ);
 
   try{
     if(isISBN){
-      // ISBN: buscar en ambas fuentes
+      if(pEl)pEl.textContent='Buscando por ISBN...';
       const [r1,r2]=await Promise.allSettled([
         fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${cleanQ}&format=json&jscmd=data`).then(r=>r.json()),
         fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanQ}`).then(r=>r.json())
       ]);
       if(r1.status==='fulfilled'){const bk=r1.value[`ISBN:${cleanQ}`];if(bk)addBook({titulo:bk.title||'',autor:(bk.authors||[]).map(a=>a.name).join(', '),año:bk.publish_date?.match(/\d{4}/)?.[0]||'',isbn:cleanQ,editorial:(bk.publishers||[]).map(p=>p.name).join(', '),idioma:'',paginas:bk.number_of_pages||'',cover:bk.cover?.large||bk.cover?.medium||'',descripcion:'',genero:'',olKey:'',source:'Open Library ISBN'});}
-      if(r2.status==='fulfilled')(r2.value.items||[]).forEach(item=>addBook({...parseGB(item),isbn:cleanQ,source:'Google Books ISBN'}));
+      if(r2.status==='fulfilled'&&r2.value.items)(r2.value.items||[]).forEach(item=>addBook({...parseGB(item),source:'Google Books ISBN'}));
     } else {
-      // PASO 1: Open Library primero (sin limite de requests)
-      if(pEl)pEl.textContent='Buscando en Open Library...';
-      try{
-        const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=10&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);
-        const d=await r.json();
-        (d.docs||[]).forEach(b=>addBook(parseOL(b)));
-      }catch(e){}
+      // Construir URL de OL usando title y author por separado — mucho más preciso
+      if(pEl)pEl.textContent='Buscando...';
+      let olUrl=`https://openlibrary.org/search.json?fields=${OL_FIELDS}&limit=10`;
+      if(titulo&&autor){
+        olUrl+=`&title=${encodeURIComponent(titulo)}&author=${encodeURIComponent(autor)}`;
+      } else if(titulo){
+        olUrl+=`&title=${encodeURIComponent(titulo)}`;
+      } else if(autor){
+        olUrl+=`&author=${encodeURIComponent(autor)}`;
+      }
 
-      // Si OL ya encontró suficiente, mostrar y no molestar a GB
-      if(_sRes.length>=3){show();return;}
+      const r=await fetch(olUrl);
+      const d=await r.json();
+      (d.docs||[]).forEach(b=>addBook(parseOL(b)));
 
-      // PASO 2: Google Books solo si OL no encontró suficiente
-      if(pEl)pEl.textContent='Buscando en Google Books...';
-      try{
-        const gbQ=titulo?`intitle:${encodeURIComponent(titulo)}${autor?' inauthor:'+encodeURIComponent(autor):''}`:encodeURIComponent(q);
-        const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${gbQ}&maxResults=8`);
-        if(r.status===429){toast('Google Books: límite alcanzado, mostrando resultados de Open Library','info');}
-        else{const d=await r.json();(d.items||[]).forEach(item=>addBook(parseGB(item)));}
-      }catch(e){}
+      // Si OL no encontró nada, intentar con q= general como fallback
+      if(_sRes.length===0&&titulo){
+        if(pEl)pEl.textContent='Buscando (modo amplio)...';
+        try{
+          const r2=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(titulo)}&fields=${OL_FIELDS}&limit=8`);
+          const d2=await r2.json();
+          (d2.docs||[]).forEach(b=>addBook(parseOL(b)));
+        }catch(e){}
+      }
+
+      // Google Books solo si OL encontró poco, y con una sola request
+      if(_sRes.length<3){
+        try{
+          let gbQ='';
+          if(titulo&&autor)gbQ=`intitle:${encodeURIComponent(titulo)}+inauthor:${encodeURIComponent(autor)}`;
+          else if(titulo)gbQ=`intitle:${encodeURIComponent(titulo)}`;
+          else gbQ=encodeURIComponent(autor);
+          const rGB=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${gbQ}&maxResults=6`);
+          if(rGB.ok){const dGB=await rGB.json();(dGB.items||[]).forEach(item=>addBook(parseGB(item)));}
+        }catch(e){}
+      }
     }
 
-    // Refinar con editorial si se ingresó
     if(editorial&&_sRes.length>1){
       const f=_sRes.filter(b=>b.editorial?.toLowerCase().includes(editorial.toLowerCase()));
       if(f.length)_sRes=f;
     }
-  }catch(e){}
+  }catch(e){console.error('searchBooks error:',e);}
 
   show();
 }
@@ -1731,7 +1748,7 @@ async function fetchBooks(q){
   if(res.length<4){try{const r=await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=6&fields=key,title,author_name,first_publish_year,isbn,publisher,cover_i,language,number_of_pages_median,subject`);const d=await r.json();(d.docs||[]).forEach(b=>{addBook({titulo:b.title||'',autor:(b.author_name||[]).join(', '),año:b.first_publish_year,isbn:(b.isbn||[])[0]||'',editorial:(b.publisher||[])[0]||'',idioma:(b.language||[])[0]||'',paginas:b.number_of_pages_median||'',cover:b.cover_i?`https://covers.openlibrary.org/b/id/${b.cover_i}-M.jpg`:'',genero:(b.subject||[])[0]||'',olKey:b.key||'',source:'Open Library'});});}catch(e){}}
 
   // Google Books en español
-  try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};addBook({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'es',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});});}catch(e){}
+  try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=8`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};addBook({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'es',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});});}catch(e){}
 
   // Google Books sin restricción de idioma
   if(res.length<4){try{const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=5`);const d=await r.json();(d.items||[]).forEach(item=>{const info=item.volumeInfo||{};addBook({titulo:info.title||'',autor:(info.authors||[]).join(', '),año:info.publishedDate?.substring(0,4)||'',isbn:((info.industryIdentifiers||[]).find(i=>i.type==='ISBN_13')||{}).identifier||'',editorial:info.publisher||'',idioma:info.language||'',paginas:info.pageCount||'',cover:info.imageLinks?.thumbnail?.replace('http:','https:')||'',descripcion:info.description||'',genero:(info.categories||[])[0]||'',source:'Google Books'});});}catch(e){}}
@@ -1782,11 +1799,26 @@ async function selectBook(i,ctx){
 }
 
 async function searchEpub(titulo,autor){
-  const wrap=document.getElementById('epub-result');let found=null;
-  try{const r=await fetch(`https://gutendex.com/books/?search=${encodeURIComponent(titulo)}`);if(r.ok){const d=await r.json();const bk=(d.results||[])[0];if(bk){const u=bk.formats?.['application/epub+zip']||bk.formats?.['application/epub'];if(u)found={url:u,source:'Project Gutenberg'};}}}catch(e){}
-  if(!found){try{const r=await fetch(`https://standardebooks.org/ebooks?query=${encodeURIComponent(titulo+' '+autor)}`);if(r.ok){const html=await r.text();const m=html.match(/href="(\/ebooks\/[^"]+\.epub[^"]*)"/);if(m)found={url:'https://standardebooks.org'+m[1],source:'Standard Ebooks'};}}catch(e){}}
-  if(found){selBookData.epub_url=found.url;wrap.innerHTML=`<div class="epub-card"><div class="epub-src">✅ ${found.source}</div><div class="epub-ttl">Versión digital encontrada</div><div class="epub-acts"><a href="${found.url}" target="_blank" class="btn btn-ghost btn-sm">Vista previa</a></div></div>`;}
-  else{wrap.innerHTML='<p style="color:var(--text3);font-size:11px">📭 No se encontró versión digital gratuita</p>';}
+  const wrap=document.getElementById('epub-result');
+  if(!wrap)return;
+  let found=null;
+  // Gutenberg — filtrar solo español (languages includes 'es')
+  try{
+    const r=await fetch(`https://gutendex.com/books/?search=${encodeURIComponent(titulo)}&languages=es`);
+    if(r.ok){const d=await r.json();const bk=(d.results||[])[0];if(bk){const u=bk.formats?.['application/epub+zip']||bk.formats?.['application/epub'];if(u)found={url:u,source:'Project Gutenberg (español)'};}}}catch(e){}
+  // Standard Ebooks — principalmente en inglés, no aplica para español
+  if(!found){
+    // Deshabilitado: Standard Ebooks no tiene colección en español
+  }
+  if(found){
+    if(selBookData)selBookData.epub_url=found.url;
+    wrap.style.display='block';
+    wrap.innerHTML=`<div class="epub-card"><div class="epub-src">✅ ${found.source}</div><div class="epub-ttl">Versión digital gratuita en español</div><div class="epub-acts"><a href="${found.url}" target="_blank" class="btn btn-ghost btn-sm">Descargar</a></div></div>`;
+  } else {
+    // No mostrar nada si no hay epub en español
+    wrap.style.display='none';
+    wrap.innerHTML='';
+  }
 }
 
 async function addSelected(){
@@ -1948,7 +1980,7 @@ async function buscarDescManual(){
   let desc='';
   try{
     const q=`intitle:${titulo}${autor?' inauthor:'+autor:''}`;
-    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);
+    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=8`);
     const d=await r.json();
     const best=(d.items||[]).find(i=>similarityScore(i.volumeInfo?.title||'',titulo)>0.5&&i.volumeInfo?.description);
     if(best)desc=best.volumeInfo.description;
@@ -1985,7 +2017,7 @@ async function buscarDescDetalle(bookId){
   let desc='';
   try{
     const q=`intitle:${b.titulo}${b.autor?' inauthor:'+b.autor:''}`;
-    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=5`);
+    const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=es&maxResults=8`);
     const d=await r.json();
     const best=(d.items||[]).find(i=>similarityScore(i.volumeInfo?.title||'',b.titulo)>0.5&&i.volumeInfo?.description);
     if(best)desc=best.volumeInfo.description;
