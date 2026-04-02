@@ -387,6 +387,14 @@ select option{background:var(--card)}
           <option value="mas1">🎁 Más de uno (para regalar)</option>
         </select>
       </div>
+      <div class="filter-group"><label class="filter-label">Completitud</label>
+        <select id="f-pendientes" onchange="applyFilters()">
+          <option value="">Todos</option>
+          <option value="sin-portada">Sin portada</option>
+          <option value="sin-desc">Sin descripción</option>
+          <option value="sin-estante">Sin estante</option>
+        </select>
+      </div>
       <div class="filter-group"><label class="filter-label">Ordenar</label>
         <select id="f-sort" onchange="applyFilters()"><option value="fecha">Fecha agregado</option><option value="titulo">Título A-Z</option><option value="autor">Autor</option><option value="coleccion">Colección</option><option value="año">Año</option><option value="ejemplares">Ejemplares</option></select>
       </div>
@@ -437,31 +445,83 @@ select option{background:var(--card)}
     <div class="mh"><div class="mt">Agregar libro</div><button class="mc" onclick="closeAdd()">✕</button></div>
     <div class="mb">
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('search')" id="tab-search">🔍 Buscar</button>
+        <button class="tab-btn active" onclick="switchTab('search')" id="tab-search">🔍 Buscar / Agregar</button>
         <button class="tab-btn" onclick="switchTab('digital')" id="tab-digital">📁 Archivo</button>
-        <button class="tab-btn" onclick="switchTab('manual')" id="tab-manual">✏️ Manual</button>
       </div>
 
       <div id="tc-search">
+        <!-- Banner colección -->
+        <div id="m-coleccion-banner" style="display:none;background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent);align-items:center;justify-content:space-between">
+          <span id="m-coleccion-banner-txt">📚 Cargando desde colección</span>
+          <button onclick="clearColeccionMode()" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:13px">✕</button>
+        </div>
+        <!-- Campos principales — buscan automáticamente -->
         <div class="fg">
-          <div class="fr"><label class="fl">Título o autor</label><input type="text" id="modal-q" placeholder="Ej: Cien años de soledad, Borges..." oninput="debBookSearch()"></div>
-          <div class="fr"><label class="fl">ISBN</label><input type="text" id="modal-isbn" placeholder="9789875780620" oninput="debBookSearch()"></div>
-          <div class="fr"><label class="fl">Editorial</label><input type="text" id="modal-editorial" placeholder="Ej: Punto de Lectura" oninput="debBookSearch()"></div>
-          <div class="fr"><label class="fl">Año</label><input type="number" id="modal-año" placeholder="Ej: 2016" oninput="debBookSearch()"></div>
+          <div class="fr"><label class="fl">Título *</label><input type="text" id="m-titulo" oninput="debBookSearch()"></div>
+          <div class="fr"><label class="fl">Autor</label><input type="text" id="m-autor" oninput="debBookSearch()"></div>
+          <div class="fr"><label class="fl">ISBN</label><input type="text" id="m-isbn" placeholder="9789875780620" oninput="debBookSearch()"></div>
+          <div class="fr"><label class="fl">Editorial</label><input type="text" id="m-editorial" oninput="debBookSearch()"></div>
+          <div class="fr"><label class="fl">Año</label><input type="number" id="m-año"></div>
+          <div class="fr"><label class="fl">Idioma</label><input type="text" id="m-idioma" value="Español"></div>
+          <div class="fr"><label class="fl">Género</label><input type="text" id="m-genero"></div>
+          <div class="fr"><label class="fl">Páginas</label><input type="number" id="m-paginas"></div>
+          <div class="fr"><label class="fl">Ejemplares</label><input type="number" id="m-ejemplares" value="1" min="1"></div>
         </div>
         <!-- Foto opcional -->
-        <div style="margin-bottom:10px">
-          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px">
-            <button class="btn btn-ghost btn-sm" onclick="startCam()" id="btn-start-cam">📷 Activar cámara</button>
-            <button class="btn btn-ghost btn-sm" onclick="captureCam()" id="btn-cap" style="display:none">⊙ Capturar</button>
-            <label class="btn btn-ghost btn-sm" style="cursor:pointer">🖼 Subir foto de portada<input type="file" accept="image/*" style="display:none" onchange="loadPhotoFile(event)"></label>
-          </div>
-          <video id="cam-video" autoplay playsinline></video>
-          <canvas id="cam-canvas" style="display:none"></canvas>
-          <img id="cam-photo">
+        <div style="margin-bottom:8px;display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="startCam()" id="btn-start-cam">📷 Cámara</button>
+          <button class="btn btn-ghost btn-sm" onclick="captureCam()" id="btn-cap" style="display:none">⊙ Capturar</button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer">🖼 Foto de portada<input type="file" accept="image/*" style="display:none" onchange="loadPhotoFile(event)"></label>
         </div>
-        <div id="s-loading" style="display:none;text-align:center;padding:16px"><div class="spin" style="margin:0 auto 8px"></div><p style="color:var(--text3);font-size:12px">Buscando en Open Library y Google Books...</p></div>
-        <div id="s-results-wrap" style="display:none"><div class="fl" style="margin-bottom:6px">Resultados</div><div id="s-results" class="srl"></div></div>
+        <video id="cam-video" autoplay playsinline></video>
+        <canvas id="cam-canvas" style="display:none"></canvas>
+        <img id="cam-photo">
+        <!-- Tipo y estante -->
+        <div class="fr"><label class="fl">Tipo</label>
+          <select id="m-tipo" onchange="toggleManualFields()"><option value="fisico">📖 Físico</option><option value="ebook">💻 Ebook</option></select>
+        </div>
+        <div id="m-fisico-fields">
+          <div class="fr"><label class="fl">Estante</label><div id="m-shelf-picker"></div></div>
+          <div class="fr"><label class="fl">Colección</label>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="m-coleccion" placeholder="Ej: Harry Potter">
+              <button class="btn btn-ghost btn-sm" onclick="openColeccionPicker()" title="Cargar desde colección existente" style="flex-shrink:0">📚</button>
+            </div>
+          </div>
+        </div>
+        <div class="fr"><label class="fl">Mis comentarios / Contenido</label>
+          <textarea id="m-comentarios" rows="2" placeholder="Ej: Contiene Ficciones y El Aleph..." style="resize:vertical"></textarea>
+        </div>
+        <!-- Resultados de búsqueda -->
+        <div id="s-loading" style="display:none;text-align:center;padding:10px"><div class="spin" style="margin:0 auto 6px"></div><p style="color:var(--text3);font-size:12px">Buscando...</p></div>
+        <div id="s-results-wrap" style="display:none;margin-bottom:10px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px">Resultados — elegí uno para pre-completar</div>
+          <div id="s-results" class="srl"></div>
+        </div>
+        <!-- Botones de búsqueda de info extra -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+          <button class="btn btn-ghost btn-sm" onclick="buscarPortadaManual()">🖼 Buscar portada</button>
+          <button class="btn btn-ghost btn-sm" onclick="buscarDescManual()">📝 Buscar desc.</button>
+          <button class="btn btn-ghost btn-sm" onclick="buscarBioManual()">👤 Buscar bio</button>
+        </div>
+        <!-- Cover preview -->
+        <div id="m-cover-wrap" style="display:none;margin-bottom:10px;align-items:center;gap:12px;background:var(--bg);border-radius:8px;padding:10px;border:1px solid var(--border)">
+          <img id="m-cover-preview" style="width:50px;height:75px;object-fit:cover;border-radius:4px;box-shadow:var(--shadow)">
+          <div style="flex:1">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="m-cover-source">Portada encontrada</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-accent btn-sm" onclick="usarPortada()">✓ Usar esta</button>
+              <button class="btn btn-ghost btn-sm" onclick="buscarPortadaManual(true)">↻ Siguiente</button>
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer">📁 Subir<input type="file" accept="image/*" style="display:none" onchange="subirPortadaManual(event)"></label>
+            </div>
+          </div>
+        </div>
+        <!-- Colección picker -->
+        <div id="coleccion-picker" style="display:none;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:8px;box-shadow:var(--shadow-lg)">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Elegí una colección</div>
+          <div id="coleccion-picker-list" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto"></div>
+        </div>
+        <button class="btn btn-accent" style="width:100%;margin-top:4px" onclick="addManual()">✅ Agregar</button>
       </div>
 
       <div id="tc-digital" style="display:none">
@@ -496,62 +556,6 @@ select option{background:var(--card)}
         <div id="dz-add-btn" style="display:none"><button class="btn btn-accent" style="width:100%" onclick="addAllDigital()">✅ Agregar todos a la biblioteca</button></div>
       </div>
 
-      <div id="tc-manual" style="display:none">
-        <div id="m-coleccion-banner" style="display:none;background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--accent);display:none;align-items:center;justify-content:space-between">
-          <span id="m-coleccion-banner-txt">📚 Cargando desde colección</span>
-          <button onclick="clearColeccionMode()" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:13px">✕</button>
-        </div>
-        <div class="fg">
-          <div class="fr"><label class="fl">Título *</label><input type="text" id="m-titulo"></div>
-          <div class="fr"><label class="fl">Autor *</label><input type="text" id="m-autor"></div>
-          <div class="fr"><label class="fl">ISBN</label><input type="text" id="m-isbn" placeholder="9788426481238"></div>
-          <div class="fr"><label class="fl">Año</label><input type="number" id="m-año"></div>
-          <div class="fr"><label class="fl">Editorial</label><input type="text" id="m-editorial"></div>
-          <div class="fr"><label class="fl">Idioma</label><input type="text" id="m-idioma" value="Español"></div>
-          <div class="fr"><label class="fl">Género</label><input type="text" id="m-genero"></div>
-          <div class="fr"><label class="fl">Páginas</label><input type="number" id="m-paginas"></div>
-          <div class="fr"><label class="fl">Ejemplares</label><input type="number" id="m-ejemplares" value="1" min="1"></div>
-        </div>
-        <div class="fr"><label class="fl">Tipo</label>
-          <select id="m-tipo" onchange="toggleManualFields()"><option value="fisico">📖 Físico</option><option value="ebook">💻 Ebook</option></select>
-        </div>
-        <div id="m-fisico-fields">
-          <div class="fr"><label class="fl">Estante</label><div id="m-shelf-picker"></div></div>
-          <div class="fr"><label class="fl">Colección</label>
-            <div style="display:flex;gap:6px">
-              <input type="text" id="m-coleccion" placeholder="Ej: Harry Potter">
-              <button class="btn btn-ghost btn-sm" onclick="openColeccionPicker()" title="Cargar desde colección existente" style="flex-shrink:0">📚</button>
-            </div>
-          </div>
-        </div>
-        <div class="fr"><label class="fl">Mis comentarios / Contenido</label>
-          <textarea id="m-comentarios" rows="2" placeholder="Ej: Contiene Ficciones y El Aleph..." style="resize:vertical"></textarea>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
-          <button class="btn btn-ghost btn-sm" onclick="buscarMasInfo()">🔍 Buscar datos</button>
-          <button class="btn btn-ghost btn-sm" onclick="buscarPortadaManual()">🖼 Buscar portada</button>
-          <button class="btn btn-ghost btn-sm" onclick="buscarBioManual()">👤 Buscar bio</button>
-        </div>
-        <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="addManual()">✅ Agregar</button>
-        <!-- Cover preview -->
-        <div id="m-cover-wrap" style="display:none;margin-top:10px;align-items:center;gap:12px;background:var(--bg);border-radius:8px;padding:10px;border:1px solid var(--border)">
-          <img id="m-cover-preview" style="width:50px;height:75px;object-fit:cover;border-radius:4px;box-shadow:var(--shadow)">
-          <div style="flex:1">
-            <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="m-cover-source">Portada encontrada</div>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-accent btn-sm" onclick="usarPortada()">✓ Usar esta</button>
-              <button class="btn btn-ghost btn-sm" onclick="buscarPortadaManual(true)">↻ Buscar otra</button>
-              <label class="btn btn-ghost btn-sm" style="cursor:pointer">📁 Subir<input type="file" accept="image/*" style="display:none" onchange="subirPortadaManual(event)"></label>
-            </div>
-          </div>
-        </div>
-        <!-- Colección picker dropdown -->
-        <div id="coleccion-picker" style="display:none;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-top:8px;box-shadow:var(--shadow-lg)">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Elegí una colección</div>
-          <div id="coleccion-picker-list" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto"></div>
-        </div>
-      </div>
-
       <div id="sel-preview">
         <div class="sp-div"></div>
         <div class="sp-top">
@@ -583,9 +587,9 @@ const SHELF_STRUCTURE={
     'D':['D1','D2','D3i','D3d','D4','D5','D6','D7']
   },
   'Sala lectura':{
-    'E':['E1','E2','E3','E4'],
-    'F':['F1','F2','F3','F4'],
-    'G':['G1','G2','G3','G4']
+    'E':['E1','E2','E3','E4','E5'],
+    'F':['F1','F2','F3','F4','F5'],
+    'G':['G1','G2','G3','G4','G5']
   }
 };
 function allShelfIds(){const ids=[];Object.values(SHELF_STRUCTURE).forEach(cols=>Object.values(cols).forEach(arr=>ids.push(...arr)));return ids;}
@@ -974,10 +978,15 @@ function applyFilters(){
   const fmt=document.getElementById('f-formato').value,col=document.getElementById('f-coleccion').value;
   const sort=document.getElementById('f-sort').value;
   const ej=document.getElementById('f-ejemplares')?.value||'';
+  const pend=document.getElementById('f-pendientes')?.value||'';
   filtered=library.filter(b=>{
     const mQ=!q||[b.titulo,b.autor,b.descripcion,b.mis_comentarios,b.genero,b.coleccion].some(f=>f&&f.toLowerCase().includes(q));
     const mEj=!ej||(ej==='mas1'&&(b.ejemplares||1)>1);
-    return mQ&&(!tipo||b.tipo===tipo)&&(!estado||b.estado===estado)&&(!est||b.estante===est)&&(!gen||b.genero===gen)&&(!fmt||b.formato_digital===fmt)&&(!col||b.coleccion===col)&&mEj;
+    const mPend=!pend||
+      (pend==='sin-portada'&&!b.portada_url)||
+      (pend==='sin-desc'&&!b.descripcion)||
+      (pend==='sin-estante'&&(b.tipo==='fisico'||b.tipo==='ambos')&&!b.estante);
+    return mQ&&(!tipo||b.tipo===tipo)&&(!estado||b.estado===estado)&&(!est||b.estante===est)&&(!gen||b.genero===gen)&&(!fmt||b.formato_digital===fmt)&&(!col||b.coleccion===col)&&mEj&&mPend;
   });
   filtered.sort((a,b)=>
     sort==='titulo'?(a.titulo||'').localeCompare(b.titulo||''):
@@ -1017,7 +1026,7 @@ function renderShelves(){
     B1:49,B2:43,B3:45,BGi:88,BGd:88,B6:44,B7:44,
     C1:42,C2:43,C3:51,C4i:44,C5i:44,C4G:88,C6:44,C7:44,
     D1:48,D2:44,D3i:42,D3d:42,D4:44,D5:44,D6:44,D7:44,
-    E1:44,E2:44,E3:44,E4:44,F1:44,F2:44,F3:44,F4:44,G1:44,G2:44,G3:44,G4:44
+    E1:44,E2:44,E3:44,E4:44,E5:44,F1:44,F2:44,F3:44,F4:44,F5:44,G1:44,G2:44,G3:44,G4:44,G5:44
   };
   // Shelves that share a row (side by side)
   const PAIRED={'A4i':'A4d','BGi':'BGd','C4i':'C4i','D3i':'D3d'};
@@ -1194,10 +1203,10 @@ function renderDetail(b){
       <button class="cover-upload-btn" style="right:140px" onclick="buscarPortadaDetalle('${b.id}')">🔍 Buscar portada</button>
     </div>
     <div class="dp-title">
-      <input type="text" value="${eh(b.titulo||'')}" style="background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);width:100%;outline:none;padding:2px 0;font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:400;line-height:1.2" onchange="updField('titulo',this.value);markUnsaved()" oninput="markUnsaved()">
+      <input type="text" value="${eh(b.titulo||'')}" style="background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);width:100%;outline:none;padding:2px 0;font-family:'Cormorant Garamond',serif;font-size:23px;font-weight:400;line-height:1.2" onchange="confirmFieldEdit('titulo',this.value,this)" oninput="markUnsaved()">
     </div>
     <div class="dp-author">
-      <input type="text" value="${eh(b.autor||'')}" style="background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--accent);width:100%;outline:none;padding:2px 0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('autor',this.value);markUnsaved()" oninput="markUnsaved()">
+      <input type="text" value="${eh(b.autor||'')}" style="background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--accent);width:100%;outline:none;padding:2px 0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="confirmFieldEdit('autor',this.value,this)" oninput="markUnsaved()">
     </div>
     <div class="dp-badges">
       ${tipoBadge(b)}
@@ -1476,79 +1485,83 @@ function openAdd(){
   selBookData=null;dzPending=[];_mShelf='';_pShelf='';
   document.getElementById('add-modal').classList.add('open');
   document.getElementById('sel-preview').style.display='none';
-  document.getElementById('modal-q').value='';
-  const mIsbn=document.getElementById('modal-isbn');if(mIsbn)mIsbn.value='';
-  const mEd=document.getElementById('modal-editorial');if(mEd)mEd.value='';
-  const mAno=document.getElementById('modal-año');if(mAno)mAno.value='';
   document.getElementById('s-results-wrap').style.display='none';
   document.getElementById('s-loading').style.display='none';
   document.getElementById('drop-list').innerHTML='';
   document.getElementById('dz-add-btn').style.display='none';
   document.querySelectorAll('[id^="spb-m-"],[id^="spb-p-"]').forEach(b=>b.classList.remove('selected'));
-  // Reset camera (now inside search tab)
+  // Reset camera
   const photo=document.getElementById('cam-photo');
   if(photo){photo.src='';photo.style.display='none';}
   stopCam();
-  // Reset manual form completo
+  // Reset all form fields
   ['m-titulo','m-autor','m-isbn','m-año','m-editorial','m-genero','m-paginas','m-coleccion','m-comentarios'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
+  const mej=document.getElementById('m-ejemplares');if(mej)mej.value='1';
   document.getElementById('m-idioma').value='Español';
   document.getElementById('m-tipo').value='fisico';
   document.getElementById('m-fisico-fields').style.display='block';
-  // Reset search results
   document.getElementById('s-results').innerHTML='';
+  const banner=document.getElementById('m-coleccion-banner');if(banner)banner.style.display='none';
   switchTab('search');
-  // Init autocompletes para el tab manual
   initAutocompletes();
-  // Reset manual search cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
   _coleccionMode=null;_coverResults=[];_coverIdx=0;
   const cw=document.getElementById('m-cover-wrap');if(cw)cw.style.display='none';
 }
 function closeAdd(){document.getElementById('add-modal').classList.remove('open');stopCam();window._pendingMergeId=null;}
 function switchTab(t){
-  ['search','digital','manual'].forEach(x=>{
+  ['search','digital'].forEach(x=>{
     document.getElementById('tc-'+x).style.display='none';
     document.getElementById('tab-'+x).classList.remove('active');
   });
   document.getElementById('tc-'+t).style.display='block';
   document.getElementById('tab-'+t).classList.add('active');
   if(t!=='search')stopCam();
-  if(t==='manual'||t==='digital'){
+  if(t==='digital'){
     document.getElementById('sel-preview').style.display='none';
     selBookData=null;
   }
-  if(t==='manual')initAutocompletes();
+  if(t==='search')initAutocompletes();
 }
 function toggleManualFields(){const t=document.getElementById('m-tipo').value;document.getElementById('m-fisico-fields').style.display=t==='fisico'?'block':'none';}
 function togglePreviewFields(){const t=document.getElementById('prev-tipo').value;document.getElementById('prev-fisico-fields').style.display=t==='fisico'?'block':'none';}
 function setDzTab(t){currentDzTab=t;['files','folder','drive'].forEach(x=>{document.getElementById('dz-'+x+'-zone').style.display=x===t?'block':'none';document.getElementById('dzt-'+x).classList.toggle('active',x===t);});}
 
-function debBookSearch(){clearTimeout(bookDT);bookDT=setTimeout(searchBooks,500);}
+function debBookSearch(){clearTimeout(bookDT);bookDT=setTimeout(searchBooks,600);}
+
+function confirmFieldEdit(field,newVal,inputEl){
+  const b=library.find(x=>x.id===selBookId);
+  const oldVal=b?b[field]:'';
+  if(!oldVal||oldVal===newVal){updField(field,newVal);markUnsaved();return;}
+  if(confirm(`¿Reemplazar ${field==='titulo'?'el título':field==='autor'?'el autor':'el ISBN'}?\n\nActual: "${oldVal}"\nNuevo: "${newVal}"`)){
+    updField(field,newVal);markUnsaved();
+  } else {
+    inputEl.value=oldVal; // revert
+  }
+}
 async function searchBooks(){
-  const titulo=document.getElementById('modal-q').value.trim();
-  const isbn=document.getElementById('modal-isbn')?.value.trim()||'';
-  const editorial=document.getElementById('modal-editorial')?.value.trim()||'';
-  const año=document.getElementById('modal-año')?.value.trim()||'';
-  const q=isbn||[titulo,editorial,año].filter(Boolean).join(' ');
+  const titulo=(document.getElementById('m-titulo')?.value||'').trim();
+  const autor=(document.getElementById('m-autor')?.value||'').trim();
+  const isbn=(document.getElementById('m-isbn')?.value||'').trim();
+  const editorial=(document.getElementById('m-editorial')?.value||'').trim();
+  const q=isbn||[titulo,autor].filter(Boolean).join(' ');
   if(q.length<2){document.getElementById('s-results-wrap').style.display='none';return;}
   document.getElementById('s-loading').style.display='block';
   document.getElementById('s-results-wrap').style.display='none';
   try{
-    _sRes=await fetchBooks(q);
-    // Si hay editorial o año, filtrar resultados que coincidan mejor
-    if(editorial||año){
-      const filtered=_sRes.filter(b=>
-        (!editorial||b.editorial?.toLowerCase().includes(editorial.toLowerCase()))||
-        (!año||String(b.año)===año)
-      );
-      if(filtered.length)_sRes=filtered;
+    let results=await fetchBooks(q);
+    // Afinar con editorial si está cargada
+    if(editorial&&results.length>1){
+      const filtered=results.filter(b=>b.editorial?.toLowerCase().includes(editorial.toLowerCase()));
+      if(filtered.length)results=filtered;
     }
+    _sRes=results;
     document.getElementById('s-loading').style.display='none';
     document.getElementById('s-results').innerHTML=_sRes.length
       ?_sRes.map((b,i)=>srHTML(b,i,'s')).join('')
-      :`<p style="color:var(--text3);font-size:12px;text-align:center;padding:14px">Sin resultados</p>`;
+      :`<p style="color:var(--text3);font-size:12px;text-align:center;padding:14px">Sin resultados — completá los datos y agregá igual</p>`;
     document.getElementById('s-results-wrap').style.display='block';
   }catch(e){document.getElementById('s-loading').style.display='none';toast('Error buscando','err');}
 }
@@ -1582,22 +1595,38 @@ async function fetchBooks(q){
   return res;
 }
 async function selectBook(i,ctx){
-  const results=ctx==='s'?_sRes:_cRes;const bk=results[i];if(!bk)return;
+  const bk=_sRes[i];if(!bk)return;
   selBookData={...bk};
-  document.querySelectorAll(`#s-results .sri`).forEach((el,j)=>el.classList.toggle('sel',j===i));
-  document.getElementById('sel-preview').style.display='block';
-  document.getElementById('prev-cov').src=bk.cover||'';document.getElementById('prev-cov').style.display=bk.cover?'block':'none';
-  document.getElementById('prev-title').textContent=bk.titulo;document.getElementById('prev-author').textContent=bk.autor;
-  document.getElementById('prev-meta').textContent=[bk.año,bk.editorial,bk.isbn].filter(Boolean).join(' · ');
-  document.getElementById('epub-result').innerHTML='<p style="color:var(--text3);font-size:11px">🔍 Buscando versión digital gratuita...</p>';
-  if(bk.olKey){try{const wr=await fetch(`https://openlibrary.org${bk.olKey}.json`);const wd=await wr.json();
-    if(wd.description)selBookData.descripcion=typeof wd.description==='string'?wd.description:wd.description.value||'';
-    if(wd.subjects?.length)selBookData.genero=wd.subjects[0];
-    if(wd.authors?.length){try{const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);const ad=await ar.json();if(ad.bio)selBookData.bio_autor=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';}catch(e){}}
-    try{const tr=await fetch(`https://openlibrary.org${bk.olKey}/toc.json`);if(tr.ok){const td=await tr.json();selBookData.indice=(td||[]).map((c,i)=>({numero:String(i+1),titulo:c.title||'',pagina:c.pagenum||''}));}}catch(e){}
+  document.querySelectorAll('#s-results .sri').forEach((el,j)=>el.classList.toggle('sel',j===i));
+  // Pre-fill form fields — only fill empty ones, never overwrite existing data
+  const setIfEmpty=(id,val)=>{if(val){const el=document.getElementById(id);if(el&&!el.value.trim())el.value=val;}};
+  setIfEmpty('m-titulo',bk.titulo);
+  setIfEmpty('m-autor',bk.autor);
+  setIfEmpty('m-isbn',bk.isbn);
+  setIfEmpty('m-año',String(bk.año||''));
+  setIfEmpty('m-editorial',bk.editorial);
+  setIfEmpty('m-idioma',bk.idioma==='es'?'Español':bk.idioma||'');
+  setIfEmpty('m-genero',bk.genero);
+  setIfEmpty('m-paginas',String(bk.paginas||''));
+  // Cover — show preview only if no cover yet
+  if(bk.cover&&!window._manualCover){
+    window._manualCover=bk.cover;
+    const wrap=document.getElementById('m-cover-wrap');
+    const img=document.getElementById('m-cover-preview');
+    const src=document.getElementById('m-cover-source');
+    if(img){img.src=bk.cover;img.onload=()=>{if(wrap)wrap.style.display='flex';};}
+    if(src)src.textContent=bk.source||'Online';
+  }
+  // Description — store silently
+  if(bk.descripcion&&!window._manualDesc)window._manualDesc=bk.descripcion;
+  toast(`Datos de "${bk.titulo}" pre-cargados — editá lo que necesites`,'ok');
+  // Fetch extra data from Open Library silently
+  if(bk.olKey){try{
+    const wr=await fetch(`https://openlibrary.org${bk.olKey}.json`);const wd=await wr.json();
+    if(wd.description&&!window._manualDesc)window._manualDesc=typeof wd.description==='string'?wd.description:wd.description.value||'';
+    if(wd.subjects?.length&&!document.getElementById('m-genero').value)document.getElementById('m-genero').value=wd.subjects[0];
+    if(wd.authors?.length&&!window._manualBio){try{const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);const ad=await ar.json();if(ad.bio)window._manualBio=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';}catch(e){}}
   }catch(e){}}
-  if(bk.descripcion&&!selBookData.descripcion)selBookData.descripcion=bk.descripcion;
-  await searchEpub(bk.titulo,bk.autor);
 }
 
 async function searchEpub(titulo,autor){
@@ -1910,7 +1939,7 @@ async function addManual(){
 
 async function startCam(){try{mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('cam-video');v.srcObject=mediaStream;v.style.display='block';document.getElementById('btn-start-cam').style.display='none';document.getElementById('btn-cap').style.display='inline-flex';}catch(e){toast('No se pudo acceder a la cámara','err');}}
 function captureCam(){const v=document.getElementById('cam-video'),c=document.getElementById('cam-canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);const p=document.getElementById('cam-photo');p.src=c.toDataURL('image/jpeg');p.style.display='block';stopCam();v.style.display='none';document.getElementById('cam-isbn-row').style.display='block';document.getElementById('cam-q').focus();}
-function loadPhotoFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const p=document.getElementById('cam-photo');p.src=ev.target.result;p.style.display='block';document.getElementById('cam-isbn-row').style.display='block';document.getElementById('cam-q').focus();};r.readAsDataURL(f);}
+function loadPhotoFile(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const p=document.getElementById('cam-photo');p.src=ev.target.result;p.style.display='block';};r.readAsDataURL(f);debBookSearch();}
 async function searchFromCam(){const q=document.getElementById('cam-q').value.trim();if(!q){toast('Ingresá un título o ISBN','err');return;}toast('Buscando...','info');_cRes=await fetchBooks(q);if(!_cRes.length){toast('Sin resultados','err');return;}document.getElementById('cam-results').innerHTML=_cRes.map((b,i)=>srHTML(b,i,'c')).join('');document.getElementById('cam-results-wrap').style.display='block';}
 function stopCam(){if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}const v=document.getElementById('cam-video');if(v){v.style.display='none';v.srcObject=null;}const bc=document.getElementById('btn-cap'),bs=document.getElementById('btn-start-cam');if(bc)bc.style.display='none';if(bs)bs.style.display='inline-flex';}
 
@@ -2072,7 +2101,7 @@ async function parseEpubMeta(arr){
 function unzip(arr){const files={};let i=0;while(i<arr.length-4){if(arr[i]===0x50&&arr[i+1]===0x4B&&arr[i+2]===0x03&&arr[i+3]===0x04){const comp=arr[i+8]|(arr[i+9]<<8);const cSize=arr[i+18]|(arr[i+19]<<8)|(arr[i+20]<<16)|(arr[i+21]<<24);const uSize=arr[i+22]|(arr[i+23]<<8)|(arr[i+24]<<16)|(arr[i+25]<<24);const fnLen=arr[i+26]|(arr[i+27]<<8);const exLen=arr[i+28]|(arr[i+29]<<8);const name=new TextDecoder().decode(arr.slice(i+30,i+30+fnLen));const start=i+30+fnLen+exLen;if(comp===0)files[name]=arr.slice(start,start+uSize);else files[name]=arr.slice(start,start+cSize);i=start+(comp===0?uSize:cSize);}else{i++;}}return files;}
 
 function debSearch(){clearTimeout(searchDT);searchDT=setTimeout(applyFilters,300);}
-function clearFilters(){['f-tipo','f-estado','f-estante','f-genero','f-formato','f-sort','f-coleccion','f-ejemplares'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-sort'?'fecha':'';});document.getElementById('search-input').value='';applyFilters();}
+function clearFilters(){['f-tipo','f-estado','f-estante','f-genero','f-formato','f-sort','f-coleccion','f-ejemplares','f-pendientes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-sort'?'fecha':'';});document.getElementById('search-input').value='';applyFilters();}
 let _moveMode=null; // {type:'shelf'|'coleccion', value:string}
 let _moveDestShelf='';
 
