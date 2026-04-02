@@ -55,6 +55,15 @@ select option{background:var(--card)}
 .vbtn.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
 #books-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:20px}
 .book-card{cursor:pointer;transition:transform .2s}
+.book-card.selected{outline:2px solid var(--accent);outline-offset:2px;background:var(--accent-dim)}
+.book-card .sel-check{display:none;position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid var(--border2);align-items:center;justify-content:center;font-size:11px;z-index:3;pointer-events:none}
+.select-mode .book-card .sel-check{display:flex}
+.book-card.selected .sel-check{background:var(--accent);border-color:var(--accent);color:#fff}
+.book-card{position:relative}
+.bli.selected{background:var(--accent-dim);outline:1px solid var(--accent)}
+.bli .sel-check{display:none;width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid var(--border2);align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.select-mode .bli .sel-check{display:flex}
+.bli.selected .sel-check{background:var(--accent);border-color:var(--accent);color:#fff}
 .book-card:hover{transform:translateY(-4px)}
 .book-card:hover .bc-img,.book-card:hover .bc-ph{box-shadow:-4px 0 0 rgba(181,116,58,.3),0 12px 32px rgba(60,45,20,.18)}
 .bc-img,.bc-ph{width:100%;aspect-ratio:2/3;border-radius:4px 10px 10px 4px;box-shadow:-4px 0 0 rgba(60,45,20,.15),0 4px 14px rgba(60,45,20,.12);transition:box-shadow .2s;display:block;object-fit:cover;background:var(--bg3)}
@@ -338,6 +347,14 @@ select option{background:var(--card)}
 </div>
 
 <div id="toasts"></div>
+
+<!-- Banner flotante de selección múltiple -->
+<div id="selection-banner" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:600;background:var(--card);border:1px solid var(--accent);border-radius:14px;padding:12px 18px;box-shadow:0 8px 32px rgba(0,0,0,.18);display:none;align-items:center;gap:12px;font-size:13px;white-space:nowrap">
+  <span id="sel-count" style="color:var(--accent);font-weight:600">0 seleccionados</span>
+  <button class="btn btn-accent btn-sm" onclick="openMoveSelected()">📦 Mover a estante...</button>
+  <button class="btn btn-ghost btn-sm" onclick="selectAll()">Todos</button>
+  <button class="btn btn-ghost btn-sm" onclick="clearSelection()">✕ Cancelar</button>
+</div>
 <button id="fab" onclick="openAdd()">+</button>
 
 <div id="header">
@@ -417,10 +434,13 @@ select option{background:var(--card)}
   <div id="main">
     <div id="main-top">
       <span id="book-count">0 libros</span>
-      <div id="view-toggle">
-        <div class="vbtn active" onclick="setView('grid')" id="vb-grid">⊞</div>
-        <div class="vbtn" onclick="setView('list')" id="vb-list">☰</div>
-        <div class="vbtn" onclick="setView('shelves')" id="vb-shelves">🗂</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="btn-select-mode" class="btn btn-ghost btn-sm" onclick="toggleSelectMode()" style="font-size:12px">☑ Seleccionar</button>
+        <div id="view-toggle">
+          <div class="vbtn active" onclick="setView('grid')" id="vb-grid">⊞</div>
+          <div class="vbtn" onclick="setView('list')" id="vb-list">☰</div>
+          <div class="vbtn" onclick="setView('shelves')" id="vb-shelves">🗂</div>
+        </div>
       </div>
     </div>
     <div id="empty-state"><div class="ei">📚</div><h3>Tu biblioteca está vacía</h3><p style="color:var(--text3)">Agregá tu primer libro con el botón "+"</p><button class="btn btn-accent" onclick="openAdd()" style="margin-top:8px">+ Agregar libro</button></div>
@@ -604,6 +624,7 @@ let driveFileId=null,accessToken=null,tokenClient=null,epubFolderId=null,epubFol
 let pendingChanges=false,confirmCb=null,mergeCb=null,syncPending=[];
 let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null,currentDzTab='files';
+let _selectedIds=new Set(),_selectMode=false,_mvShelf='';
 let _mShelf='',_pShelf='';
 let _unsyncedLocal=false; // hay cambios locales sin subir a Drive
 let _driveRefreshing=false;
@@ -612,6 +633,12 @@ let _tokenExpiry=0; // timestamp cuando expira el token
 window.onload=()=>{
   // Atajos de teclado globales
   document.addEventListener('keydown',e=>{
+    // Cmd+F → foco en la búsqueda principal
+    if((e.metaKey||e.ctrlKey)&&e.key==='f'){
+      e.preventDefault();
+      const si=document.getElementById('search-input');
+      if(si){si.focus();si.select();}
+    }
     // Cmd+N (Mac) o Ctrl+N → Agregar libro
     if((e.metaKey||e.ctrlKey)&&e.key==='n'){
       e.preventDefault();
@@ -676,7 +703,9 @@ function renderShelfPicker(cid,prefix){
   el.innerHTML=html;
 }
 function pickShelf(prefix,id){
-  if(prefix==='m')_mShelf=id;else _pShelf=id;
+  if(prefix==='m')_mShelf=id;
+  else if(prefix==='mv')_mvShelf=id;
+  else _pShelf=id;
   document.querySelectorAll(`[id^="spb-${prefix}-"]`).forEach(b=>b.classList.toggle('selected',b.id===`spb-${prefix}-${id}`));
 }
 
@@ -1050,8 +1079,99 @@ function bookPlaceholder(b,style=''){
   titulo=titulo.substring(0,40); // max 40 chars para el placeholder
   return`<div class="bc-ph" style="${style}"><div class="bc-ph-line"></div><div class="bc-ph-title">${eh(titulo)}</div><div class="bc-ph-author">${eh(b.autor||'')}</div></div>`;
 }
-function renderGrid(){document.getElementById('books-grid').innerHTML=filtered.map(b=>`<div class="book-card" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}${bookPlaceholder(b,b.portada_url?'display:none':'')}<div class="bk-info"><div class="bk-title">${eh(b.titulo||'')}</div><div class="bk-author">${eh(b.autor||'')}</div><div class="bk-badges">${bookBadges(b)}</div></div></div>`).join('');}
-function renderList(){document.getElementById('books-list').innerHTML=filtered.map(b=>`<div class="bli" onclick="openDetail('${b.id}')">${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}<div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:12px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div><div class="bli-meta">${b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="bli-estante">${eh(b.estante)}</span>`:''}${tipoBadge(b)}${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div></div>`).join('');}
+function toggleSelectMode(){
+  _selectMode=!_selectMode;
+  _selectedIds.clear();
+  const btn=document.getElementById('btn-select-mode');
+  const grid=document.getElementById('books-grid');
+  const list=document.getElementById('books-list');
+  if(_selectMode){
+    btn.textContent='✕ Cancelar selección';
+    btn.style.background='var(--accent)';btn.style.color='#fff';
+    grid.classList.add('select-mode');list.classList.add('select-mode');
+  } else {
+    btn.textContent='☑ Seleccionar';
+    btn.style.background='';btn.style.color='';
+    grid.classList.remove('select-mode');list.classList.remove('select-mode');
+    document.getElementById('selection-banner').style.display='none';
+  }
+  renderGrid();renderList();
+}
+
+function handleCardClick(e,id){
+  if(_selectMode){
+    e.stopPropagation();
+    if(_selectedIds.has(id))_selectedIds.delete(id);
+    else _selectedIds.add(id);
+    updateSelectionBanner();
+    renderGrid();renderList();
+  } else {
+    openDetail(id);
+  }
+}
+
+function updateSelectionBanner(){
+  const banner=document.getElementById('selection-banner');
+  const n=_selectedIds.size;
+  if(n>0){
+    banner.style.display='flex';
+    document.getElementById('sel-count').textContent=`${n} libro${n!==1?'s':''} seleccionado${n!==1?'s':''}`;
+  } else {
+    banner.style.display='none';
+  }
+}
+
+function selectAll(){
+  filtered.forEach(b=>_selectedIds.add(b.id));
+  updateSelectionBanner();renderGrid();renderList();
+}
+
+function clearSelection(){
+  _selectedIds.clear();
+  _selectMode=false;
+  const btn=document.getElementById('btn-select-mode');
+  btn.textContent='☑ Seleccionar';btn.style.background='';btn.style.color='';
+  document.getElementById('books-grid').classList.remove('select-mode');
+  document.getElementById('books-list').classList.remove('select-mode');
+  document.getElementById('selection-banner').style.display='none';
+  renderGrid();renderList();
+}
+
+function openMoveSelected(){
+  if(_selectedIds.size===0)return;
+  // Reusar el modal de organizar con un picker de estante destino
+  const modal=document.createElement('div');
+  modal.id='move-sel-modal';
+  modal.style.cssText='position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center';
+  const libros=library.filter(b=>_selectedIds.has(b.id));
+  modal.innerHTML=`
+    <div style="background:var(--card);border-radius:16px;padding:24px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:4px">Mover ${libros.length} libro${libros.length!==1?'s':''}</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">${libros.slice(0,3).map(b=>b.titulo).join(', ')}${libros.length>3?` y ${libros.length-3} más`:''}...</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Elegí el estante destino</div>
+      <div id="move-sel-picker"></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-accent" style="flex:1" onclick="executeMoveSelected()">✅ Mover</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('move-sel-modal').remove()">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  renderShelfPicker('move-sel-picker','mv');
+}
+
+async function executeMoveSelected(){
+  if(!_mvShelf){toast('Elegí un estante destino','err');return;}
+  const ids=[..._selectedIds];
+  ids.forEach(id=>{const b=library.find(x=>x.id===id);if(b){b.estante=_mvShelf;b.tipo=b.tipo==='ebook'?'ambos':b.tipo||'fisico';}});
+  saveLocal();await saveToDrive();
+  document.getElementById('move-sel-modal')?.remove();
+  clearSelection();
+  renderLib();
+  toast(`${ids.length} libro${ids.length!==1?'s':''} movido${ids.length!==1?'s':''} a ${_mvShelf} ✓`,'ok');
+}
+
+function renderGrid(){document.getElementById('books-grid').innerHTML=filtered.map(b=>`<div class="book-card${_selectedIds.has(b.id)?' selected':''}" onclick="handleCardClick(event,'${b.id}')"><div class="sel-check">${_selectedIds.has(b.id)?'✓':''}</div>${b.portada_url?`<img class="bc-img" src="${b.portada_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:``}${bookPlaceholder(b,b.portada_url?'display:none':'')}<div class="bk-info"><div class="bk-title">${eh(b.titulo||'')}</div><div class="bk-author">${eh(b.autor||'')}</div><div class="bk-badges">${bookBadges(b)}</div></div></div>`).join('');}
+function renderList(){document.getElementById('books-list').innerHTML=filtered.map(b=>`<div class="bli${_selectedIds.has(b.id)?' selected':''}" onclick="handleCardClick(event,'${b.id}')"><div class="sel-check">${_selectedIds.has(b.id)?'✓':''}</div>${b.portada_url?`<img class="bli-cover" src="${b.portada_url}" onerror="this.style.display='none'">`:`<div class="bli-ph" style="background:linear-gradient(135deg,#8b5e3c,#b5743a);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;width:34px;height:51px;flex-shrink:0">📖</div>`}<div class="bli-main"><div class="bli-title">${eh(b.titulo||'')}${b.coleccion?` <span style="font-size:12px;color:var(--purple)">· ${eh(b.coleccion)}</span>`:''}</div><div class="bli-sub">${eh(b.autor||'')}${b.año?' · '+b.año:''}${b.editorial?' · '+eh(b.editorial):''}</div></div><div class="bli-meta">${b.estante&&(b.tipo==='fisico'||b.tipo==='ambos')?`<span class="bli-estante">${eh(b.estante)}</span>`:''}${tipoBadge(b)}${b.estado?`<span class="badge badge-${b.estado}">${b.estado}</span>`:''}</div></div>`).join('');}
 function renderShelves(){
   const sv=document.getElementById('shelves-view');sv.innerHTML='';
   // Heights proportional to real cm (base 30cm=44px)
