@@ -1435,12 +1435,31 @@ function renderDetail(b){
 }
 
 // ── COVER UPLOAD ──────────────────────────────────────────
+// Comprime imagen a max 400x600px, JPEG 80%
+function compressImage(dataUrl,maxW=400,maxH=600,quality=0.8){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxW||h>maxH){
+        const ratio=Math.min(maxW/w,maxH/h);
+        w=Math.round(w*ratio);h=Math.round(h*ratio);
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.src=dataUrl;
+  });
+}
+
 function uploadCover(event,bookId){
   const file=event.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=async(e)=>{
     const b=library.find(x=>x.id===bookId);if(!b)return;
-    b.portada_url=e.target.result;
+    b.portada_url=await compressImage(e.target.result);
     await saveToDrive();renderLib();renderDetail(b);
     toast('Portada actualizada ✓','ok');
   };
@@ -1994,12 +2013,13 @@ function usarPortada(){
 function subirPortadaManual(event){
   const file=event.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    window._manualCover=e.target.result;
+  reader.onload=async(e)=>{
+    const compressed=await compressImage(e.target.result);
+    window._manualCover=compressed;
     const img=document.getElementById('m-cover-preview');
-    img.src=e.target.result;
+    img.src=compressed;
     document.getElementById('m-cover-wrap').style.display='flex';
-    document.getElementById('m-cover-source').textContent='Imagen subida manualmente';
+    document.getElementById('m-cover-source').textContent='Imagen subida';
     toast('Portada cargada ✓','ok');
   };
   reader.readAsDataURL(file);
