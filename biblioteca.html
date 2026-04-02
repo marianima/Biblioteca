@@ -521,6 +521,8 @@ select option{background:var(--card)}
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Elegí una colección</div>
           <div id="coleccion-picker-list" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto"></div>
         </div>
+        <!-- Versión digital gratuita (se llena al elegir un libro) -->
+        <div id="epub-result" style="margin-top:8px;display:none"></div>
         <button class="btn btn-accent" style="width:100%;margin-top:4px" onclick="addManual()">✅ Agregar</button>
       </div>
 
@@ -569,7 +571,7 @@ select option{background:var(--card)}
           <div class="fr"><label class="fl">Estante</label><div id="prev-shelf-picker"></div></div>
           <div class="fr"><label class="fl">Colección (si aplica)</label><input type="text" id="prev-coleccion" placeholder="Ej: Harry Potter"></div>
         </div>
-        <div id="epub-result" style="margin-top:10px"></div>
+        <div id="epub-result-old" style="display:none"></div>
         <button class="btn btn-accent" style="width:100%;margin-top:14px" onclick="addSelected()">✅ Agregar a mi biblioteca</button>
       </div>
     </div>
@@ -1596,7 +1598,7 @@ function openAdd(){
   window._manualCover='';window._manualDesc='';window._manualBio='';
   _coleccionMode=null;_coverResults=[];_coverIdx=0;
   const cw=document.getElementById('m-cover-wrap');if(cw)cw.style.display='none';
-  // Foco automático en el título
+  const er=document.getElementById('epub-result');if(er){er.style.display='none';er.innerHTML='';}
   setTimeout(()=>{const t=document.getElementById('m-titulo');if(t)t.focus();},100);
 }
 function closeAdd(){document.getElementById('add-modal').classList.remove('open');stopCam();window._pendingMergeId=null;}
@@ -1760,7 +1762,13 @@ async function selectBook(i,ctx){
   }
   // Description — store silently
   if(bk.descripcion&&!window._manualDesc)window._manualDesc=bk.descripcion;
-  toast(`Datos de "${bk.titulo}" pre-cargados — editá lo que necesites`,'ok');
+  toast(`"${bk.titulo}" pre-cargado — editá lo que necesites`,'ok');
+  // Show epub-result area and start searching
+  const epubDiv=document.getElementById('epub-result');
+  if(epubDiv){
+    epubDiv.style.display='block';
+    epubDiv.innerHTML='<p style="color:var(--text3);font-size:11px">🔍 Buscando versión digital gratuita...</p>';
+  }
   // Fetch extra data from Open Library silently
   if(bk.olKey){try{
     const wr=await fetch(`https://openlibrary.org${bk.olKey}.json`);const wd=await wr.json();
@@ -1768,6 +1776,8 @@ async function selectBook(i,ctx){
     if(wd.subjects?.length&&!document.getElementById('m-genero').value)document.getElementById('m-genero').value=wd.subjects[0];
     if(wd.authors?.length&&!window._manualBio){try{const ar=await fetch(`https://openlibrary.org${wd.authors[0].author.key}.json`);const ad=await ar.json();if(ad.bio)window._manualBio=typeof ad.bio==='string'?ad.bio:ad.bio.value||'';}catch(e){}}
   }catch(e){}}
+  // Search epub
+  await searchEpub(bk.titulo,bk.autor);
 }
 
 async function searchEpub(titulo,autor){
