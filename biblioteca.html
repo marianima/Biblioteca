@@ -1307,6 +1307,7 @@ function renderDetail(b){
       <button class="btn btn-danger btn-sm" onclick="deleteBook('${b.id}')">🗑 Eliminar</button>
       ${b.tipo!=='ambos'?`<button class="btn btn-ghost btn-sm" onclick="promptAddOtherFormat('${b.id}')">➕ ${b.tipo==='fisico'?'+ digital':'+ físico'}</button>`:''}
       <button class="btn btn-ghost btn-sm" onclick="buscarPortadaDetalle('${b.id}')">🖼 Portada</button>
+      <button class="btn btn-ghost btn-sm" onclick="quitarPortada('${b.id}')">🗑 Quitar portada</button>
       <button class="btn btn-ghost btn-sm" onclick="buscarDescDetalle('${b.id}')">📝 Descripción</button>
       <button class="btn btn-ghost btn-sm" onclick="buscarBioDetalle('${b.id}')">👤 Bio autor</button>
       <button class="btn btn-ghost btn-sm" onclick="rebuscarMetadatos('${b.id}')">🔄 Todo</button>
@@ -1850,6 +1851,14 @@ function subirPortadaManual(event){
     toast('Portada cargada ✓','ok');
   };
   reader.readAsDataURL(file);
+}
+
+async function quitarPortada(bookId){
+  if(!confirm('¿Quitar la portada actual y volver al placeholder?'))return;
+  const b=library.find(x=>x.id===bookId);if(!b)return;
+  b.portada_url='';
+  await saveToDrive();renderLib();renderDetail(b);
+  toast('Portada quitada ✓','ok');
 }
 
 async function buscarPortadaDetalle(bookId){
