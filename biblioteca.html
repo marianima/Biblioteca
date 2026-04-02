@@ -606,7 +606,7 @@ let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null,currentDzTab='files';
 let _mShelf='',_pShelf='';
 let _unsyncedLocal=false; // hay cambios locales sin subir a Drive
-let _driveCheckInterval=null;
+let _driveRefreshing=false;
 let _tokenExpiry=0; // timestamp cuando expira el token
 
 window.onload=()=>{
@@ -726,9 +726,6 @@ async function onDriveConnected(){
     _unsyncedLocal=false;
     localStorage.removeItem('lib_unsynced');
   }
-  // Iniciar chequeo periódico de token (cada 4 minutos)
-  if(_driveCheckInterval)clearInterval(_driveCheckInterval);
-  _driveCheckInterval=setInterval(checkTokenAndRefresh,4*60*1000);
 }
 
 function autoConnectDrive(){
@@ -743,18 +740,21 @@ function autoConnectDrive(){
 }
 
 async function checkTokenAndRefresh(){
-  if(!tokenClient)return;
-  if(Date.now()>_tokenExpiry){
-    // Token expirado o por expirar → refrescar silenciosamente
-    try{tokenClient.requestAccessToken({prompt:'none'});}
-    catch(e){
-      accessToken=null;
-      document.getElementById('drive-btn').innerHTML='☁ Conectar Drive';
-      document.getElementById('drive-btn').style.color='';
-      document.getElementById('off-banner').classList.add('show');
-      showUnsyncedBanner();
-    }
-  }
+  // Solo se llama cuando el usuario sincroniza manualmente o agrega un libro
+  if(!tokenClient||!accessToken)return false;
+  if(Date.now()<_tokenExpiry-30000)return true; // Token vigente
+  // Token por expirar — refrescar silenciosamente
+  return new Promise(resolve=>{
+    try{
+      const orig=window._gisCallback;
+      window._gisCallback=(resp)=>{
+        if(orig)orig(resp);
+        resolve(!resp.error);
+      };
+      tokenClient.requestAccessToken({prompt:'none'});
+      setTimeout(()=>resolve(false),5000); // timeout
+    }catch(e){resolve(false);}
+  });
 }
 
 function showUnsyncedBanner(){
