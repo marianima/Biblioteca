@@ -1640,7 +1640,55 @@ function normalizeISBN(raw){
 }
 
 // ── AUTOCOMPLETE ──────────────────────────────────────────
+const GENEROS_CANONICOS=[
+  'Literatura','Literatura Sudamericana','Cuento','Novela','Poesía','Teatro','Ensayo',
+  'Biografía','Historia','Filosofía','Psicología','Ciencia','Economía','Política',
+  'Arte','Música','Cocina','Viajes','Humor','Infantil','Juvenil'
+];
+
+const GENERO_MAP={
+  // Inglés → Español
+  'fiction':'Literatura','literary fiction':'Literatura','short stories':'Cuento',
+  'short story':'Cuento','novel':'Novela','novels':'Novela','poetry':'Poesía',
+  'poems':'Poesía','drama':'Teatro','plays':'Teatro','essays':'Ensayo','essay':'Ensayo',
+  'biography':'Biografía','autobiography':'Biografía','memoir':'Biografía',
+  'history':'Historia','historical':'Historia','philosophy':'Filosofía',
+  'psychology':'Psicología','self-help':'Psicología','science':'Ciencia',
+  'economics':'Economía','economy':'Economía','politics':'Política',
+  'political science':'Política','art':'Arte','music':'Música','cooking':'Cocina',
+  'food':'Cocina','travel':'Viajes','humor':'Humor','comedy':'Humor',
+  'children':'Infantil','juvenile':'Juvenil','young adult':'Juvenil',
+  // Variantes en español
+  'narrativa':'Literatura','narrativa hispanoamericana':'Literatura Sudamericana',
+  'literatura latinoamericana':'Literatura Sudamericana',
+  'cuentos':'Cuento','cuentos cortos':'Cuento','poemas':'Poesía',
+  'teatro':'Teatro','ensayo':'Ensayo','filosofía':'Filosofía',
+  'psicología':'Psicología','ciencia':'Ciencia','economía':'Economía',
+  'política':'Política','arte':'Arte','música':'Música','cocina':'Cocina',
+  'viajes':'Viajes','humor':'Humor','infantil':'Infantil','juvenil':'Juvenil'
+};
+
+function normalizeGenero(g){
+  if(!g)return'';
+  const key=(g||'').toLowerCase().trim();
+  if(GENERO_MAP[key])return GENERO_MAP[key];
+  // Buscar coincidencia parcial
+  for(const[k,v] of Object.entries(GENERO_MAP)){
+    if(key.includes(k)||k.includes(key))return v;
+  }
+  // Si ya es canónico, devolver tal cual
+  const canon=GENEROS_CANONICOS.find(c=>c.toLowerCase()===key);
+  if(canon)return canon;
+  // Si no hay mapeo, devolver el original capitalizado
+  return g.charAt(0).toUpperCase()+g.slice(1);
+}
+
 function getLibraryValues(field){
+  if(field==='genero'){
+    // Combinar lista canónica con géneros existentes en la biblioteca
+    const enLib=[...new Set(library.map(b=>b[field]).filter(Boolean))];
+    return[...new Set([...GENEROS_CANONICOS,...enLib])].sort();
+  }
   return[...new Set(library.map(b=>b[field]).filter(Boolean))].sort();
 }
 function setupAutocomplete(inputId,field){
@@ -1932,7 +1980,7 @@ async function selectBook(i,ctx){
   setIfEmpty('m-año',String(bk.año||''));
   setIfEmpty('m-editorial',bk.editorial);
   setIfEmpty('m-idioma',bk.idioma==='es'?'Español':bk.idioma||'');
-  setIfEmpty('m-genero',bk.genero);
+  setIfEmpty('m-genero',normalizeGenero(bk.genero));
   setIfEmpty('m-paginas',String(bk.paginas||''));
   // Cover — show preview only if no cover yet
   if(bk.cover&&!window._manualCover){
@@ -2276,7 +2324,7 @@ async function addManual(){
     document.getElementById('m-shelf-picker')?.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
-  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:document.getElementById('m-genero').value.trim(),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:document.getElementById('m-comentarios')?.value.trim()||'',estado:'pendiente'};
+  const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:normalizeGenero(document.getElementById('m-genero').value.trim()),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:document.getElementById('m-comentarios')?.value.trim()||'',estado:'pendiente'};
   // Reset manual cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
   // Si hay modo colección activo, limpiar solo lo necesario para el siguiente libro
