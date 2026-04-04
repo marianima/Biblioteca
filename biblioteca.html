@@ -2024,9 +2024,9 @@ async function searchEpub(titulo,autor){
     // Deshabilitado: Standard Ebooks no tiene colección en español
   }
   if(found){
-    if(selBookData)selBookData.epub_url=found.url;
+    // Solo mostrar el link, no guardar automáticamente
     wrap.style.display='block';
-    wrap.innerHTML=`<div class="epub-card"><div class="epub-src">✅ ${found.source}</div><div class="epub-ttl">Versión digital gratuita en español</div><div class="epub-acts"><a href="${found.url}" target="_blank" class="btn btn-ghost btn-sm">Descargar</a></div></div>`;
+    wrap.innerHTML=`<div class="epub-card"><div class="epub-src">✅ ${found.source}</div><div class="epub-ttl">Versión gratuita en español disponible</div><div class="epub-acts"><a href="${found.url}" target="_blank" class="btn btn-ghost btn-sm">⬇ Ir al archivo</a></div></div>`;
   } else {
     // No mostrar nada si no hay epub en español
     wrap.style.display='none';
@@ -2317,6 +2317,9 @@ function clearColeccionMode(){
 }
 
 async function addManual(){
+  if(window._addingBook)return; // guard contra doble click
+  window._addingBook=true;
+  try{
   const t=document.getElementById('m-titulo').value.trim();if(!t){toast('El título es obligatorio','err');return;}
   const tipo=document.getElementById('m-tipo').value;
   if(tipo==='fisico'&&!_mShelf){
@@ -2325,31 +2328,51 @@ async function addManual(){
     return;
   }
   const nb={id:crypto.randomUUID(),tipo,titulo:t,autor:document.getElementById('m-autor').value.trim(),isbn:normalizeISBN(document.getElementById('m-isbn').value.trim()),año:document.getElementById('m-año').value,editorial:document.getElementById('m-editorial').value.trim(),idioma:document.getElementById('m-idioma').value.trim()||'Español',genero:normalizeGenero(document.getElementById('m-genero').value.trim()),paginas:document.getElementById('m-paginas').value,ejemplares:parseInt(document.getElementById('m-ejemplares')?.value||'1')||1,portada_url:window._manualCover||'',descripcion:window._manualDesc||'',bio_autor:window._manualBio||'',indice:[],epub_url:'',drive_url:'',drive_file_id:'',estante:tipo==='fisico'?_mShelf:'',coleccion:tipo==='fisico'?document.getElementById('m-coleccion').value.trim():'',fecha_agregado:new Date().toISOString(),mis_comentarios:document.getElementById('m-comentarios')?.value.trim()||'',estado:'pendiente'};
-  // Reset manual cache
   window._manualCover='';window._manualDesc='';window._manualBio='';
-  // Si hay modo colección activo, limpiar solo lo necesario para el siguiente libro
   if(_coleccionMode){
+    // Chequear duplicado también en modo colección
+    const existingC=checkForDuplicate(nb);
+    if(existingC){
+      showMergePrompt(existingC,nb,
+        async()=>{await saveToDrive();renderLib();toast('Unificados ✓','ok');openDetail(existingC.id);},
+        async()=>{library.unshift(nb);await saveToDrive();renderLib();toast(`"${nb.titulo}" agregado`,'ok');}
+      );
+      document.getElementById('m-titulo').value='';
+      document.getElementById('m-isbn').value='';
+      document.getElementById('m-año').value='';
+      document.getElementById('m-paginas').value='';
+      document.getElementById('m-comentarios').value='';
+      document.getElementById('m-ejemplares').value='1';
+      document.getElementById('m-titulo').focus();
+      return;
+    }
     document.getElementById('m-titulo').value='';
-    // autor se mantiene
     document.getElementById('m-isbn').value='';
     document.getElementById('m-año').value='';
     document.getElementById('m-paginas').value='';
-    document.getElementById('m-comentarios').value=''; // limpiar descripción/contenido
-    document.getElementById('m-ejemplares').value='1'; // volver a 1
+    document.getElementById('m-comentarios').value='';
+    document.getElementById('m-ejemplares').value='1';
     library.unshift(nb);await saveToDrive();renderLib();toast(`"${nb.titulo}" agregado — seguí cargando la colección`,'ok');openDetail(nb.id);
     document.getElementById('m-titulo').focus();
     return;
   }
-  // Chequear duplicado antes de agregar
   const existing=checkForDuplicate(nb);
   if(existing){
     showMergePrompt(existing,nb,
-      async()=>{await saveToDrive();renderLib();closeAdd();toast('Unificados ✓','ok');openDetail(existing.id);},
+      async()=>{
+        // Unificar: combinar datos del nuevo en el existente
+        if(nb.estante&&!existing.estante)existing.estante=nb.estante;
+        if(nb.portada_url&&!existing.portada_url)existing.portada_url=nb.portada_url;
+        if(nb.descripcion&&!existing.descripcion)existing.descripcion=nb.descripcion;
+        if(nb.tipo!==existing.tipo)existing.tipo='ambos';
+        await saveToDrive();renderLib();closeAdd();toast('Unificados ✓','ok');openDetail(existing.id);
+      },
       async()=>{library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);}
     );
     return;
   }
   library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
+  }finally{window._addingBook=false;}
 }
 
 async function startCam(){try{mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('cam-video');v.srcObject=mediaStream;v.style.display='block';document.getElementById('btn-start-cam').style.display='none';document.getElementById('btn-cap').style.display='inline-flex';}catch(e){toast('No se pudo acceder a la cámara','err');}}
