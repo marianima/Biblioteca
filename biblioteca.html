@@ -285,14 +285,17 @@ select option{background:var(--card)}
   #detail-panel{position:fixed;bottom:0;left:0;right:0;width:100%;height:85vh;z-index:150;border-radius:14px 14px 0 0}
   #fab{display:flex}
   #header .btn-accent{display:none}
-  #header{gap:6px;padding:0 10px;flex-wrap:nowrap}
-  #logo{font-size:20px;flex-shrink:0}
+  #header{gap:4px;padding:0 8px}
+  #header-right{display:flex;gap:4px;align-items:center;flex-shrink:0}
+  #logo{font-size:18px;flex-shrink:0}
   .logo-text{display:none}
   #search-wrap{flex:1;min-width:0;max-width:none}
-  #search-input{font-size:14px;padding:8px 10px 8px 30px;width:100%}
-  /* Drive btn: visible solo cuando no conectado, compacto */
-  #drive-btn{font-size:11px;padding:5px 8px;flex-shrink:0;white-space:nowrap}
-  #sync-btn{font-size:11px;padding:5px 8px;flex-shrink:0;white-space:nowrap}
+  #search-input{font-size:14px;padding:8px 8px 8px 28px;width:100%}
+  /* Botones drive: solo icono en móvil */
+  .sync-label,.drive-label{display:none}
+  #sync-btn{padding:6px 8px;flex-shrink:0}
+  #drive-btn{padding:6px 8px;flex-shrink:0}
+  #user-badge{display:none!important}
   #books-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px}
   .bk-title{font-size:12px}
   .bk-author{font-size:11px}
@@ -385,8 +388,8 @@ select option{background:var(--card)}
   <div id="search-wrap"><span class="si">🔍</span><input type="text" id="search-input" placeholder="Buscar título, autor, colección..." oninput="debSearch()"></div>
   <div id="header-right">
     <div id="user-badge" style="display:none"><span id="user-name"></span></div>
-    <button id="sync-btn" class="btn btn-ghost btn-sm" onclick="syncWithDrive()" style="display:none">🔄 Sincronizar</button>
-    <button id="drive-btn" class="btn btn-ghost" onclick="connectDrive()">☁ Conectar Drive</button>
+    <button id="sync-btn" class="btn btn-ghost btn-sm" onclick="syncWithDrive()" style="display:none">🔄 <span class="sync-label">Sincronizar</span></button>
+    <button id="drive-btn" class="btn btn-ghost" onclick="connectDrive()">☁ <span class="drive-label">Conectar Drive</span></button>
     <button class="btn btn-accent" onclick="openAdd()">+ Agregar</button>
   </div>
 </div>
@@ -762,7 +765,7 @@ function initGIS(cid){
 }
 
 async function onDriveConnected(){
-  document.getElementById('drive-btn').innerHTML='✅ Drive conectado';
+  document.getElementById('drive-btn').innerHTML='✅ <span class="drive-label">Drive conectado</span>';
   document.getElementById('drive-btn').style.color='var(--green)';
   document.getElementById('user-badge').style.display='flex';
   document.getElementById('user-name').textContent='☁ Drive';
