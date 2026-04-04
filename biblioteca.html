@@ -280,7 +280,23 @@ select option{background:var(--card)}
 #fab:hover{transform:scale(1.07)}
 .spin{width:15px;height:15px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:sp .6s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
-@media(max-width:768px){#sidebar{display:none}#detail-panel{position:fixed;bottom:0;left:0;right:0;width:100%;height:80vh;z-index:150;border-radius:14px 14px 0 0}#fab{display:flex}#header .btn-accent{display:none}}
+@media(max-width:768px){
+  #sidebar{display:none}
+  #detail-panel{position:fixed;bottom:0;left:0;right:0;width:100%;height:85vh;z-index:150;border-radius:14px 14px 0 0}
+  #fab{display:flex}
+  #header .btn-accent{display:none}
+  #header{gap:8px;padding:0 12px}
+  #search-wrap{flex:1;min-width:0}
+  #search-input{font-size:14px;padding:8px 12px 8px 32px;width:100%}
+  .logo-text{display:none}
+  #books-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px}
+  .bk-title{font-size:12px}
+  .bk-author{font-size:11px}
+  #main{padding:70px 12px 20px}
+  #main-top{margin-bottom:12px}
+  #btn-select-mode{font-size:11px;padding:4px 8px}
+  #selection-banner{bottom:16px;padding:10px 14px;font-size:12px;gap:8px;max-width:95vw}
+}
 </style>
 </head>
 <body>
@@ -358,7 +374,7 @@ select option{background:var(--card)}
 <button id="fab" onclick="openAdd()">+</button>
 
 <div id="header">
-  <div id="logo">📚 <em>Mi</em> Biblioteca</div>
+  <div id="logo">📚 <span class="logo-text"><em>Mi</em> Biblioteca</span></div>
   <div id="search-wrap"><span class="si">🔍</span><input type="text" id="search-input" placeholder="Buscar título, autor, colección..." oninput="debSearch()"></div>
   <div id="header-right">
     <div id="user-badge" style="display:none"><span id="user-name"></span></div>
@@ -1374,7 +1390,7 @@ function renderShelfPickerDetail(cur){
 function renderDetail(b){
   const toc=(b.indice||[]).map((r,i)=>`<tr><td><input value="${eh(r.numero||String(i+1))}" onchange="updToc(${i},'numero',this.value)" style="width:35px"></td><td><input value="${eh(r.titulo||'')}" onchange="updToc(${i},'titulo',this.value)"></td><td><input value="${eh(r.pagina||'')}" onchange="updToc(${i},'pagina',this.value)" style="width:45px"></td><td><button class="toc-del" onclick="delToc(${i})">🗑</button></td></tr>`).join('');
   const hasFisico=b.tipo==='fisico'||b.tipo==='ambos';const hasEbook=b.tipo==='ebook'||b.tipo==='ambos';
-  const locationFields=hasFisico?`<div class="mi" style="grid-column:1/-1"><div class="mk">Estante</div><div id="dp-shelf-picker" style="margin-top:6px">${renderShelfPickerDetail(b.estante)}</div></div><div class="mi" style="grid-column:1/-1"><div class="mk">Colección</div><div class="mv"><input type="text" value="${eh(b.coleccion||'')}" placeholder="Ej: Harry Potter" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('coleccion',this.value)" oninput="markUnsaved()"></div></div>`:`<div class="mi" style="grid-column:1/-1"><div class="mk">Carpeta en Drive</div><div class="mv" style="font-size:12px">${b.drive_url?`<a href="${b.drive_url}" target="_blank" style="color:var(--accent)">📂 Abrir carpeta del autor</a>`:'Sin archivo subido'}</div></div>`;
+  const locationFields=hasFisico?`<div class="mi" style="grid-column:1/-1"><div class="mk">Estante</div><div id="dp-shelf-picker" style="margin-top:6px">${renderShelfPickerDetail(b.estante)}</div></div><div class="mi" style="grid-column:1/-1"><div class="mk">Colección</div><div class="mv"><input type="text" id="dp-coleccion-input" value="${eh(b.coleccion||'')}" placeholder="Ej: Harry Potter" style="background:transparent;border:none;color:var(--text);width:100%;outline:none;padding:0;font-family:'DM Sans',sans-serif;font-size:13px" onchange="updField('coleccion',this.value)" oninput="markUnsaved()"></div></div>`:`<div class="mi" style="grid-column:1/-1"><div class="mk">Carpeta en Drive</div><div class="mv" style="font-size:12px">${b.drive_url?`<a href="${b.drive_url}" target="_blank" style="color:var(--accent)">📂 Abrir carpeta del autor</a>`:'Sin archivo subido'}</div></div>`;
   const digitalSection=hasEbook?(b.epub_url||b.drive_url?`<div class="ds"><div class="dst">📥 VERSIÓN DIGITAL</div>${b.drive_url?`<div class="epub-card"><div class="epub-src">📂 Carpeta en Drive</div><div class="epub-ttl">${eh(b.autor||b.titulo||'')}</div><div class="epub-acts"><a href="${b.drive_url}" target="_blank" class="btn btn-accent btn-sm">📂 Abrir carpeta</a></div></div>`:''} ${b.epub_url?`<div class="epub-card"><div class="epub-src">🌐 Descarga gratuita</div><div class="epub-ttl">${eh(b.titulo||'')}</div><div class="epub-acts"><a href="${b.epub_url}" target="_blank" class="btn btn-ghost btn-sm">⬇ Descargar</a></div></div>`:''}</div>`:`<div class="ds"><div class="dst">📥 EPUB / ARCHIVO DIGITAL</div><div style="display:flex;gap:6px"><input type="text" id="epub-url-inp" placeholder="URL..."><button class="btn btn-ghost btn-sm" onclick="setEpub()">OK</button></div></div>`):'';
 
   document.getElementById('dp-content').innerHTML=`
@@ -1432,8 +1448,11 @@ function renderDetail(b){
       <button class="btn btn-ghost btn-sm" onclick="buscarBioDetalle('${b.id}')">👤 Bio autor</button>
       <button class="btn btn-ghost btn-sm" onclick="rebuscarMetadatos('${b.id}')">🔄 Todo</button>
     </div>`;
+  // Autocomplete para colección en el detalle
+  setTimeout(()=>setupAutocomplete('dp-coleccion-input','coleccion'),50);
 }
 
+function openDetail(id){selBookId=id;pendingChanges=false;document.getElementById('unsaved-bar').classList.remove('show');const b=library.find(x=>x.id===id);if(!b)return;renderDetail(b);document.getElementById('detail-panel').classList.add('open');}
 // ── COVER UPLOAD ──────────────────────────────────────────
 // Comprime imagen a max 400x600px, JPEG 80%
 function compressImage(dataUrl,maxW=400,maxH=600,quality=0.8){
