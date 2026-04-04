@@ -2289,6 +2289,15 @@ async function addManual(){
     document.getElementById('m-titulo').focus();
     return;
   }
+  // Chequear duplicado antes de agregar
+  const existing=checkForDuplicate(nb);
+  if(existing){
+    showMergePrompt(existing,nb,
+      async()=>{await saveToDrive();renderLib();closeAdd();toast('Unificados ✓','ok');openDetail(existing.id);},
+      async()=>{library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);}
+    );
+    return;
+  }
   library.unshift(nb);await saveToDrive();renderLib();closeAdd();toast(`"${nb.titulo}" agregado`,'ok');openDetail(nb.id);
 }
 
@@ -2299,8 +2308,8 @@ async function searchFromCam(){const q=document.getElementById('cam-q').value.tr
 function stopCam(){if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}const v=document.getElementById('cam-video');if(v){v.style.display='none';v.srcObject=null;}const bc=document.getElementById('btn-cap'),bs=document.getElementById('btn-start-cam');if(bc)bc.style.display='none';if(bs)bs.style.display='inline-flex';}
 
 // DRAG & DROP
-function dzOver(e,z){e.preventDefault();document.getElementById('drop-zone-'+z).classList.add('drag-over');}
-function dzLeave(z){document.getElementById('drop-zone-'+z).classList.remove('drag-over');}
+function dzOver(e,z){e.preventDefault();const el=document.querySelector(`#dz-${z}-zone .drop-zone`);if(el)el.classList.add('drag-over');}
+function dzLeave(z){const el=document.querySelector(`#dz-${z}-zone .drop-zone`);if(el)el.classList.remove('drag-over');}
 function dzDropFiles(e){e.preventDefault();dzLeave('files');processFiles([...e.dataTransfer.files],null);}
 function dzFilesSelected(e){processFiles([...e.target.files],null);}
 function dzFolderSelected(e){
