@@ -290,8 +290,8 @@ select option{background:var(--card)}
   .logo-text{display:none}
   #search-wrap{flex:1;min-width:0;max-width:none}
   #search-input{font-size:14px;padding:8px 10px 8px 30px;width:100%}
-  /* En móvil, ocultar el botón de Drive cuando está conectado, solo mostrar Sincronizar */
-  #drive-btn{display:none}
+  /* Drive btn: visible solo cuando no conectado, compacto */
+  #drive-btn{font-size:11px;padding:5px 8px;flex-shrink:0;white-space:nowrap}
   #sync-btn{font-size:11px;padding:5px 8px;flex-shrink:0;white-space:nowrap}
   #books-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px}
   .bk-title{font-size:12px}
@@ -300,6 +300,9 @@ select option{background:var(--card)}
   #main-top{margin-bottom:12px}
   #btn-select-mode{font-size:11px;padding:4px 8px}
   #selection-banner{bottom:16px;padding:10px 14px;font-size:12px;gap:8px;max-width:95vw}
+  /* Modal agregar: ocupa toda la pantalla en móvil */
+  #add-modal{padding:0;align-items:flex-end}
+  #add-modal .modal{max-height:95vh;border-radius:16px 16px 0 0;margin:0;width:100%;max-width:100%}
 }
 </style>
 </head>
