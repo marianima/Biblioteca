@@ -832,19 +832,39 @@ async function driveReq(url,method='GET',body=null,hdrs={}){
   const r=await fetch(url,{method,headers:{'Authorization':'Bearer '+accessToken,...hdrs},...(body?{body}:{})});
   if(!r.ok)throw new Error('Drive '+r.status);return r;
 }
+let _driveFolderId=null; // ID de la carpeta "Mi Biblioteca" en Drive
+
+async function getDriveFolderId(){
+  if(_driveFolderId)return _driveFolderId;
+  // Buscar la carpeta "Mi Biblioteca" en cualquier lugar del Drive
+  const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=name%3D%22Mi+Biblioteca%22+and+mimeType%3D%22application%2Fvnd.google-apps.folder%22+and+trashed%3Dfalse&spaces=drive&fields=files(id,name)`);
+  const d=await r.json();
+  if(d.files?.length){
+    _driveFolderId=d.files[0].id;
+    return _driveFolderId;
+  }
+  // No existe — crearla
+  const form=new FormData();
+  form.append('metadata',new Blob([JSON.stringify({name:'Mi Biblioteca',mimeType:'application/vnd.google-apps.folder'})],{type:'application/json'}));
+  const cr=await driveReq('https://www.googleapis.com/drive/v3/files','POST',new Blob([JSON.stringify({name:'Mi Biblioteca',mimeType:'application/vnd.google-apps.folder'})],{type:'application/json'}),{'Content-Type':'application/json'});
+  const cd=await cr.json();
+  _driveFolderId=cd.id;
+  return _driveFolderId;
+}
+
 async function loadFromDrive(){
   toast('Cargando desde Drive...','info');
   try{
-    const r=await driveReq('https://www.googleapis.com/drive/v3/files?q=name%3D%22biblioteca.json%22+and+trashed%3Dfalse&spaces=drive&fields=files(id,modifiedTime)');
+    const folderId=await getDriveFolderId();
+    const q=encodeURIComponent(`name="biblioteca.json" and "${folderId}" in parents and trashed=false`);
+    const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,modifiedTime)`);
     const d=await r.json();
     if(d.files?.length){
       driveFileId=d.files[0].id;
       const driveModified=new Date(d.files[0].modifiedTime||0).getTime();
       const localModified=parseInt(localStorage.getItem('lib_modified')||'0');
-      // Si hay cambios locales más nuevos que Drive → no pisar con Drive
       if(_unsyncedLocal&&localModified>driveModified){
         toast(`Tus cambios locales son más nuevos — sincronizando con Drive...`,'info');
-        // Subir local a Drive en lugar de bajar Drive
         await saveToDrive();
         return;
       }
@@ -855,7 +875,6 @@ async function loadFromDrive(){
       renderLib();
       toast(`${library.length} libros cargados ✓`,'ok');
     } else {
-      // No existe en Drive — subir lo que tenemos local
       if(library.length>0){
         await createDriveFile();
         await saveToDrive();
@@ -868,8 +887,10 @@ async function loadFromDrive(){
   }catch(e){toast('Error Drive. Usando datos locales.','err');document.getElementById('off-banner').classList.add('show');}
 }
 async function createDriveFile(){
+  const folderId=await getDriveFolderId();
+  const meta={name:'biblioteca.json',mimeType:'application/json',parents:[folderId]};
   const form=new FormData();
-  form.append('metadata',new Blob([JSON.stringify({name:'biblioteca.json',mimeType:'application/json'})],{type:'application/json'}));
+  form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
   form.append('file',new Blob(['[]'],{type:'application/json'}));
   const r=await driveReq('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart','POST',form);
   driveFileId=(await r.json()).id;
@@ -911,10 +932,22 @@ async function saveToDrive(){
 async function ensureEpubFolder(){
   if(!accessToken)return;
   try{
-    const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=name%3D%22${encodeURIComponent(EPUB_FOLDER_NAME)}%22+and+mimeType%3D%22application%2Fvnd.google-apps.folder%22+and+trashed%3Dfalse&fields=files(id,webViewLink)`);
+    const folderId=await getDriveFolderId();
+    // Buscar dentro de Mi Biblioteca
+    const q=encodeURIComponent(`name="${EPUB_FOLDER_NAME}" and "${folderId}" in parents and mimeType="application/vnd.google-apps.folder" and trashed=false`);
+    const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,webViewLink)`);
     const d=await r.json();
     if(d.files?.length){epubFolderId=d.files[0].id;epubFolderUrl=d.files[0].webViewLink;}
-    else{const cr=await driveReq('https://www.googleapis.com/drive/v3/files','POST',JSON.stringify({name:EPUB_FOLDER_NAME,mimeType:'application/vnd.google-apps.folder'}),{'Content-Type':'application/json'});const cd=await cr.json();epubFolderId=cd.id;epubFolderUrl=`https://drive.google.com/drive/folders/${epubFolderId}`;toast(`Carpeta "${EPUB_FOLDER_NAME}" creada en Drive`,'ok');}
+    else{
+      // Crear dentro de Mi Biblioteca
+      const cr=await driveReq('https://www.googleapis.com/drive/v3/files','POST',
+        JSON.stringify({name:EPUB_FOLDER_NAME,mimeType:'application/vnd.google-apps.folder',parents:[folderId]}),
+        {'Content-Type':'application/json'});
+      const cd=await cr.json();
+      epubFolderId=cd.id;
+      epubFolderUrl=`https://drive.google.com/drive/folders/${epubFolderId}`;
+      toast(`Carpeta "${EPUB_FOLDER_NAME}" creada en Mi Biblioteca`,'ok');
+    }
   }catch(e){console.warn('epub folder',e);}
 }
 async function ensureAuthorFolder(autor){
