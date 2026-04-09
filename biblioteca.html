@@ -836,19 +836,8 @@ let _driveFolderId=null; // ID de la carpeta "Mi Biblioteca" en Drive
 
 async function getDriveFolderId(){
   if(_driveFolderId)return _driveFolderId;
-  // Buscar la carpeta "Mi Biblioteca" en cualquier lugar del Drive
-  const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=name%3D%22Mi+Biblioteca%22+and+mimeType%3D%22application%2Fvnd.google-apps.folder%22+and+trashed%3Dfalse&spaces=drive&fields=files(id,name)`);
-  const d=await r.json();
-  if(d.files?.length){
-    _driveFolderId=d.files[0].id;
-    return _driveFolderId;
-  }
-  // No existe — crearla
-  const form=new FormData();
-  form.append('metadata',new Blob([JSON.stringify({name:'Mi Biblioteca',mimeType:'application/vnd.google-apps.folder'})],{type:'application/json'}));
-  const cr=await driveReq('https://www.googleapis.com/drive/v3/files','POST',new Blob([JSON.stringify({name:'Mi Biblioteca',mimeType:'application/vnd.google-apps.folder'})],{type:'application/json'}),{'Content-Type':'application/json'});
-  const cd=await cr.json();
-  _driveFolderId=cd.id;
+  // ID hardcodeado de la carpeta Mi Biblioteca
+  _driveFolderId='1SiVrokxto1aC2CFriE1atKg-B3P-3tUx';
   return _driveFolderId;
 }
 
