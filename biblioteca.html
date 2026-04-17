@@ -646,7 +646,7 @@ const DOUBLE_SHELVES=['BGi','BGd','C4G'];
 const SHELVES={'Sala principal':{cols:['A','B','C','D'],rows:7},'Sala lectura':{cols:['E','F','G'],rows:4}};
 
 let library=[],filtered=[],selBookId=null;
-let driveFileId=null,accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
+let driveFileId='1vqajRaRWzy4g3g0lADjaIdMDD_tvAU5G',accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
 let pendingChanges=false,confirmCb=null,mergeCb=null,syncPending=[];
 let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null,currentDzTab='files';
@@ -844,45 +844,31 @@ async function getDriveFolderId(){
 async function loadFromDrive(){
   toast('Cargando desde Drive...','info');
   try{
-    const folderId=await getDriveFolderId();
-    const q=encodeURIComponent(`name="biblioteca.json" and "${folderId}" in parents and trashed=false`);
-    const r=await driveReq(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,modifiedTime)`);
-    const d=await r.json();
-    if(d.files?.length){
-      driveFileId=d.files[0].id;
-      const driveModified=new Date(d.files[0].modifiedTime||0).getTime();
-      const localModified=parseInt(localStorage.getItem('lib_modified')||'0');
-      if(_unsyncedLocal&&localModified>driveModified){
-        toast(`Tus cambios locales son más nuevos — sincronizando con Drive...`,'info');
-        await saveToDrive();
-        return;
-      }
-      const fr=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-      const driveLib=await fr.json();
-      library=driveLib;
-      saveLocal();
-      renderLib();
-      toast(`${library.length} libros cargados ✓`,'ok');
-    } else {
-      if(library.length>0){
-        await createDriveFile();
-        await saveToDrive();
-        toast(`Biblioteca subida a Drive (${library.length} libros) ✓`,'ok');
-      } else {
-        await createDriveFile();
-        toast('Archivo nuevo creado en Drive','ok');
-      }
+    // Usar ID hardcodeado directamente — no buscar
+    const r=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`);
+    const meta=await r.json();
+    const driveModified=new Date(meta.modifiedTime||0).getTime();
+    const localModified=parseInt(localStorage.getItem('lib_modified')||'0');
+    if(_unsyncedLocal&&localModified>driveModified){
+      toast('Tus cambios locales son más nuevos — sincronizando...','info');
+      await saveToDrive();
+      return;
     }
-  }catch(e){toast('Error Drive. Usando datos locales.','err');document.getElementById('off-banner').classList.add('show');}
+    const fr=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+    const driveLib=await fr.json();
+    library=driveLib;
+    saveLocal();
+    renderLib();
+    toast(`${library.length} libros cargados ✓`,'ok');
+  }catch(e){
+    console.error('Error Drive:',e);
+    toast('Error cargando desde Drive. Usando datos locales.','err');
+    document.getElementById('off-banner').classList.add('show');
+  }
 }
 async function createDriveFile(){
-  const folderId=await getDriveFolderId();
-  const meta={name:'biblioteca.json',mimeType:'application/json',parents:[folderId]};
-  const form=new FormData();
-  form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
-  form.append('file',new Blob(['[]'],{type:'application/json'}));
-  const r=await driveReq('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart','POST',form);
-  driveFileId=(await r.json()).id;
+  // Ya tenemos el ID hardcodeado, no crear nada nuevo
+  console.log('createDriveFile: usando ID existente',driveFileId);
 }
 async function saveToDrive(){
   saveLocal(); // siempre guardar local primero
