@@ -646,7 +646,7 @@ const DOUBLE_SHELVES=['BGi','BGd','C4G'];
 const SHELVES={'Sala principal':{cols:['A','B','C','D'],rows:7},'Sala lectura':{cols:['E','F','G'],rows:4}};
 
 let library=[],filtered=[],selBookId=null;
-let driveFileId='1vqajRaRWzy4g3g0lADjaIdMDD_tvAU5G',accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
+let driveFileId=null,accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
 let pendingChanges=false,confirmCb=null,mergeCb=null,syncPending=[];
 let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null,currentDzTab='files';
@@ -867,23 +867,33 @@ async function loadFromDrive(){
   }
 }
 async function createDriveFile(){
-  // Ya tenemos el ID hardcodeado, no crear nada nuevo
-  console.log('createDriveFile: usando ID existente',driveFileId);
+  const folderId=await getDriveFolderId();
+  const meta={name:'biblioteca.json',mimeType:'application/json',parents:[folderId]};
+  const form=new FormData();
+  form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+  form.append('file',new Blob([JSON.stringify(library)],{type:'application/json'}));
+  const r=await driveReq('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart','POST',form);
+  const d=await r.json();
+  driveFileId=d.id;
+  console.log('Archivo creado con ID:',driveFileId);
 }
 async function saveToDrive(){
-  saveLocal(); // siempre guardar local primero
-  if(!accessToken||!driveFileId){
-    // Sin Drive: marcar como pendiente
+  saveLocal();
+  if(!accessToken){
     _unsyncedLocal=true;
     localStorage.setItem('lib_unsynced','1');
     showUnsyncedBanner();
     return;
   }
-  // Intentar subir a Drive con hasta 3 reintentos
+  // Si no hay driveFileId, crear el archivo primero
+  if(!driveFileId){
+    await createDriveFile();
+    if(!driveFileId){toast('No se pudo crear archivo en Drive','err');return;}
+  }
   let attempts=0;
   while(attempts<3){
     try{
-      await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,'PATCH',JSON.stringify(library),{'Content-Type':'application/json'});
+      const r=await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,'PATCH',JSON.stringify(library),{'Content-Type':'application/json'});
       pendingChanges=false;
       _unsyncedLocal=false;
       localStorage.removeItem('lib_unsynced');
@@ -892,13 +902,17 @@ async function saveToDrive(){
       toast('Guardado en Drive ✓','ok');
       return;
     }catch(e){
-      attempts++;
-      if(attempts<3){
-        await new Promise(r=>setTimeout(r,1500*attempts)); // espera creciente
+      // Si 404, el archivo fue borrado — crear uno nuevo
+      if(e.message?.includes('404')){
+        driveFileId=null;
+        await createDriveFile();
+        if(!driveFileId)break;
+        attempts=0;continue;
       }
+      attempts++;
+      if(attempts<3)await new Promise(r=>setTimeout(r,1500*attempts));
     }
   }
-  // Fallaron los 3 intentos
   _unsyncedLocal=true;
   localStorage.setItem('lib_unsynced','1');
   showUnsyncedBanner();
