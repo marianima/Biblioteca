@@ -747,7 +747,7 @@ function initGIS(cid){
   if(cid==='__skip__')return;
   try{
     tokenClient=google.accounts.oauth2.initTokenClient({
-      client_id:cid,scope:'https://www.googleapis.com/auth/drive.file',
+      client_id:cid,scope:'https://www.googleapis.com/auth/drive',
       callback:async(r)=>{
         if(r.error){
           if(r.error==='access_denied'||r.error==='user_cancelled'){
