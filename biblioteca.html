@@ -646,7 +646,7 @@ const DOUBLE_SHELVES=['BGi','BGd','C4G'];
 const SHELVES={'Sala principal':{cols:['A','B','C','D'],rows:7},'Sala lectura':{cols:['E','F','G'],rows:4}};
 
 let library=[],filtered=[],selBookId=null;
-let driveFileId=null,accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
+let driveFileId=localStorage.getItem('lib_drive_file_id')||'1Z6jjkjTCTrN4iW3oFkzRKeLJq_nSxEPK',accessToken=null,tokenClient=null,epubFolderId=null,epubFolderUrl=null;
 let pendingChanges=false,confirmCb=null,mergeCb=null,syncPending=[];
 let selBookData=null,mediaStream=null,dzPending=[];
 let _sRes=[],_cRes=[],searchDT=null,bookDT=null,currentDzTab='files';
@@ -844,7 +844,6 @@ async function getDriveFolderId(){
 async function loadFromDrive(){
   toast('Cargando desde Drive...','info');
   try{
-    // Usar ID hardcodeado directamente — no buscar
     const r=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`);
     const meta=await r.json();
     const driveModified=new Date(meta.modifiedTime||0).getTime();
@@ -861,9 +860,14 @@ async function loadFromDrive(){
     renderLib();
     toast(`${library.length} libros cargados ✓`,'ok');
   }catch(e){
-    console.error('Error Drive:',e);
-    toast('Error cargando desde Drive. Usando datos locales.','err');
-    document.getElementById('off-banner').classList.add('show');
+    // Si el archivo no existe, subir lo que tenemos local
+    if(library.length>0){
+      toast('Sincronizando biblioteca local con Drive...','info');
+      await saveToDrive();
+    } else {
+      toast('Error cargando desde Drive. Usando datos locales.','err');
+      document.getElementById('off-banner').classList.add('show');
+    }
   }
 }
 async function createDriveFile(){
@@ -875,6 +879,7 @@ async function createDriveFile(){
   const r=await driveReq('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart','POST',form);
   const d=await r.json();
   driveFileId=d.id;
+  localStorage.setItem('lib_drive_file_id',driveFileId);
   console.log('Archivo creado con ID:',driveFileId);
 }
 async function saveToDrive(){
